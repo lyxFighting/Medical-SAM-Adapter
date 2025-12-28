@@ -72,7 +72,7 @@ class ISIC2016(Dataset):
         return {
             'image':img,
             'label': mask,
-            'p_label':point_label,
-            'pt':pt,
-            'image_meta_dict':image_meta_dict,
+            'p_label':point_label,# 点提示的标签（前景点=1，背景点=0）
+            'pt':pt,# 形状: [N, 2]  # N个点，(x, y)坐标
+            'image_meta_dict':image_meta_dict,# 图像元信息，这里只保留了文件名
         }

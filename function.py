@@ -150,7 +150,7 @@ def train_sam(args, net: nn.Module, optimizer, train_loader,
             with torch.no_grad():
                 if args.net == 'sam' or args.net == 'mobile_sam':
                     se, de = net.prompt_encoder(
-                        points=pt,
+                        points=pt,#本来是点坐标，但是加上了p_label（前景or背景）
                         boxes=None,
                         masks=None,
                     )
@@ -358,15 +358,15 @@ def validation_sam(args, val_loader, epoch, net: nn.Module, clean_dir=True):
                     tot += lossfunc(pred, masks) * cur_bsz
 
                     '''vis images'''
-                    if ind % args.vis == 0:
+                    if ind % args.vis == 0:#每隔 args.vis 个样本，把当前 batch 的原图 + 预测结果（mask / pred / point）拼成一张图，保存到磁盘
                         namecat = 'Test'
                         for na in name[:2
                         
                         ]:
                             img_name = na.split('/')[-1].split('.')[0]
                             namecat = namecat + img_name + '+'
-                        vis_image(origin_imgs/255,pred, masks, os.path.join(args.path_helper['sample_path'], namecat+'epoch+' +str(epoch) + '.jpg'), reverse=False, points=showp)
-                    
+                        vis_image(origin_imgs/255,pred, masks, os.path.join(args.path_helper['sample_path'], namecat+'epoch+' +str(epoch) + '.jpg'), reverse=False, points=showp)#把原图、预测 mask、GT mask（可选再加点 prompt / box），按任务类型拼成网格图，保存成一张 jpg/png，用来肉眼检查模型效果。
+
 
                     temp = eval_seg(pred, masks, threshold)
                     temp = tuple([number * cur_bsz for number in temp])

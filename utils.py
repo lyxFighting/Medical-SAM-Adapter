@@ -1168,7 +1168,7 @@ def calculate_gradient_penalty(netD, real_images, fake_images):
     return grad_penalty
 
 
-def random_click(mask, point_labels = 1):
+def random_click(mask, point_labels = 1):#根据mask随意点击一个前景的点
     # check if all masks are black
     max_label = max(set(mask.flatten()))
     if max_label == 0:

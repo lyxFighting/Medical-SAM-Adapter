@@ -152,7 +152,7 @@ class PromptEncoder(nn.Module):
         sparse_embeddings = torch.empty((bs, 0, self.embed_dim), device=self._get_device())
         if points is not None:
             coords, labels = points
-            point_embeddings = self._embed_points(coords, labels, pad=(boxes is None))
+            point_embeddings = self._embed_points(coords, labels, pad=(boxes is None))#将用户的点提示（点击位置和标签）转换为模型可以理解的向量表示（embedding）,输入：用户点击的坐标和标签（前景点/背景点）输出：点提示的向量表示，可以与图像特征结合
             sparse_embeddings = torch.cat([sparse_embeddings, point_embeddings], dim=1)
         if boxes is not None:
             box_embeddings = self._embed_boxes(boxes)

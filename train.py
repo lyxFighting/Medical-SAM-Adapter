@@ -70,7 +70,7 @@ def main():
         logger = create_logger(args.path_helper['log_path'])
         print(f'=> loaded checkpoint {checkpoint_file} (epoch {start_epoch})')
 
-    args.path_helper = set_log_dir('logs', args.exp_name)
+    args.path_helper = set_log_dir('/home/liuyuxiu/models/Medical-SAM-Adapter/logs', args.exp_name)
     logger = create_logger(args.path_helper['log_path'])
     logger.info(args)
 
@@ -88,9 +88,9 @@ def main():
     # writer.add_graph(net, Variable(input_tensor, requires_grad=True))
 
     #create checkpoint folder to save model
-    if not os.path.exists(checkpoint_path):
-        os.makedirs(checkpoint_path)
-    checkpoint_path = os.path.join(checkpoint_path, '{net}-{epoch}-{type}.pth')
+    # if not os.path.exists(checkpoint_path):
+    #     os.makedirs(checkpoint_path)
+    # checkpoint_path = os.path.join(checkpoint_path, '{net}-{epoch}-{type}.pth')
 
     '''begain training'''
     best_acc = 0.0
@@ -99,7 +99,7 @@ def main():
 
     for epoch in range(settings.EPOCH):
 
-        if epoch < 5:
+        if epoch == 0:
             if args.dataset != 'REFUGE':
                 tol, (eiou, edice) = function.validation_sam(args, nice_test_loader, epoch, net, writer)
                 logger.info(f'Total score: {tol}, IOU: {eiou}, DICE: {edice} || @ epoch {epoch}.')

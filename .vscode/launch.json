@@ -1,0 +1,23 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [  
+    {
+        "name": "current file (cuda117)",
+        "type": "python",
+        "request": "launch",
+        "program": "${file}",
+        "console": "integratedTerminal",
+        "justMyCode": false,
+        "env": {
+        "CONDA_DEFAULT_ENV": "cuda117",
+        "CONDA_PREFIX": "/home/liuyuxiu/miniconda3/envs/cuda117",
+        "CUDA_VISIBLE_DEVICES": "0,1" 
+        },
+        "cwd": "${workspaceFolder}",
+        "python": "/home/liuyuxiu/miniconda3/envs/cuda117/bin/python" 
+    }
+    ]
+}

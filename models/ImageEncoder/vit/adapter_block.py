@@ -73,7 +73,7 @@ class AdapterBlock(nn.Module):
         # Window partition
         if self.window_size > 0:
             H, W = x.shape[1], x.shape[2]
-            x, pad_hw = window_partition(x, self.window_size)
+            x, pad_hw = window_partition(x, self.window_size)#pad_hw为填充后的高度和宽度以便能被self.window_size整除，没有整除关系就无法均匀分窗口
 
          ## 3d branch
         if self.args.thd: 
@@ -151,18 +151,18 @@ class Attention(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, H, W, _ = x.shape
         # qkv with shape (3, B, nHead, H * W, C)
-        qkv = self.qkv(x).reshape(B, H * W, 3, self.num_heads, -1).permute(2, 0, 3, 1, 4)
+        qkv = self.qkv(x).reshape(B, H * W, 3, self.num_heads, -1).permute(2, 0, 3, 1, 4)#(3,25,12,196,64) [3, B, num_heads, H*W, head_dim]
         # q, k, v with shape (B * nHead, H * W, C)
-        q, k, v = qkv.reshape(3, B * self.num_heads, H * W, -1).unbind(0)
+        q, k, v = qkv.reshape(3, B * self.num_heads, H * W, -1).unbind(0)#(3,num_heads, H*W, head_dim）→3个(num_heads, H*W, head_dim）（300，196，64）
 
-        attn = (q * self.scale) @ k.transpose(-2, -1)
+        attn = (q * self.scale) @ k.transpose(-2, -1)#self.scale=1/sqrt(64) ≈ 0.125，attn.shape=(300,196,196)
 
         if self.use_rel_pos:
-            attn = add_decomposed_rel_pos(attn, q, self.rel_h, self.rel_w, (H, W), (H, W))
+            attn = add_decomposed_rel_pos(attn, q, self.rel_h, self.rel_w, (H, W), (H, W))#实现分解的相对位置编码：将2D位置编码分解为高度和宽度两个1D编码
 
         attn = attn.softmax(dim=-1)
         x = (attn @ v).view(B, self.num_heads, H, W, -1).permute(0, 2, 3, 1, 4).reshape(B, H, W, -1)
-        x = self.proj(x)
+        x = self.proj(x)#整合多头信息
 
         return x
 
