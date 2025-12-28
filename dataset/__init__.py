@@ -8,7 +8,8 @@ from utils import *
 from .atlas import Atlas
 from .brat import Brat
 from .ddti import DDTI
-from .isic import ISIC2016
+# from .isic import ISIC2016
+from .isic_mask import ISIC2016
 from .kits import KITS
 from .lidc import LIDC
 from .lnq import LNQ
