@@ -3,3 +3,5 @@
 /runs
 /data
 pipline.sh
+*.pyc
+__pycache__/
