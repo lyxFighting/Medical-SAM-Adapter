@@ -98,7 +98,7 @@ def get_network(args, net, use_gpu=True, gpu_device = 0, distribution = True):
         if args.encoder not in options:
             raise ValueError("Invalid encoder option. Please choose from: {}".format(options))
         else:
-            net = sam_model_registry[args.encoder](args,checkpoint=args.sam_ckpt).to(device)
+            net = sam_model_registry[args.encoder](args,checkpoint=args.sam_ckpt).to(device)#解包后模型在哪张 GPU，只取决于“DataParallel 之前模型在哪”
 
     elif net == 'efficient_sam':
         from models.efficient_sam import sam_model_registry
@@ -123,8 +123,9 @@ def get_network(args, net, use_gpu=True, gpu_device = 0, distribution = True):
     if use_gpu:
         #net = net.cuda(device = gpu_device)
         if distribution != 'none':
-            net = torch.nn.DataParallel(net,device_ids=[int(id) for id in args.distributed.split(',')])
-            net = net.to(device=gpu_device)
+            device_ids=[int(id) for id in args.distributed.split(',')]
+            net = torch.nn.DataParallel(net,device_ids)#计算分配到这些设备汇总到device_ids[1]
+            net = net.to(device=gpu_device)#模型在gpu_device上
         else:
             net = net.to(device=gpu_device)
 

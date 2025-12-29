@@ -144,7 +144,7 @@ def train_sam(args, net: nn.Module, optimizer, train_loader,
                 for n, value in net.image_encoder.named_parameters(): 
                     value.requires_grad = True
                     
-            origin_imgs = imgs.clone()        
+            origin_imgs = imgs.clone() 
             imgs = net.preprocess(imgs)        
             imge= net.image_encoder(imgs)
             with torch.no_grad():

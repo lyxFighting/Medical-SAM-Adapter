@@ -16,7 +16,7 @@ def parse_args():
     parser.add_argument('-pretrain', type=bool, default=False, help='adversary reverse')
     parser.add_argument('-val_freq',type=int,default=5,help='interval between each validation')
     parser.add_argument('-gpu', type=bool, default=True, help='use gpu or not')
-    parser.add_argument('-gpu_device', type=int, default=0, help='use which gpu')
+    parser.add_argument('-gpu_device', type=int, default=1, help='use which gpu')
     parser.add_argument('-sim_gpu', type=int, default=0, help='split sim to this gpu')
     parser.add_argument('-epoch_ini', type=int, default=1, help='start epoch')
     parser.add_argument('-image_size', type=int, default=1024, help='image_size')
@@ -36,7 +36,7 @@ def parse_args():
     parser.add_argument('-weights', type=str, default = 0, help='the weights file you want to test')
     parser.add_argument('-base_weights', type=str, default = 0, help='the weights baseline')
     parser.add_argument('-sim_weights', type=str, default = 0, help='the weights sim')
-    parser.add_argument('-distributed', default='none' ,type=str,help='multi GPU ids to use')
+    parser.add_argument('-distributed', default='none' ,type=str,help='multi GPU ids to use')#研究半天，用不来
     parser.add_argument('-dataset', default='isic' ,type=str,help='dataset name')
     parser.add_argument('-sam_ckpt', default='/home/liuyuxiu/models/Medical-SAM-Adapter/checkpoints/sam/sam_vit_b_01ec64.pth' , help='sam checkpoint address')
     parser.add_argument('-thd', type=bool, default=False , help='3d or not')

@@ -45,6 +45,9 @@ def main():
     GPUdevice = torch.device('cuda', args.gpu_device)
 
     net = get_network(args, args.net, use_gpu=args.gpu, gpu_device=GPUdevice, distribution = args.distributed)
+    # print(f"\nModel type: {type(net)}")
+    # print(f"Is DataParallel: {isinstance(net, nn.DataParallel)}")
+    # print(f"Device IDs: {net.device_ids}")
     if args.pretrain:
         weights = torch.load(args.pretrain)
         net.load_state_dict(weights,strict=False)
@@ -99,7 +102,7 @@ def main():
 
     for epoch in range(settings.EPOCH):
 
-        if epoch == 0:
+        if epoch < 0:
             if args.dataset != 'REFUGE':
                 tol, (eiou, edice) = function.validation_sam(args, nice_test_loader, epoch, net, writer)
                 logger.info(f'Total score: {tol}, IOU: {eiou}, DICE: {edice} || @ epoch {epoch}.')
