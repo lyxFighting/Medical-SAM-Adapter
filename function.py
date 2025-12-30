@@ -90,17 +90,9 @@ def train_sam(
             # 1. Load data (NEW FORMAT)
             # ====================================================
             imgs = pack['image'].to(dtype=torch.float32, device=GPUdevice)
-            mask_prompt = pack['mask_prompt'].to(dtype=torch.float32, device=GPUdevice)
+            masks = pack['label'].to(dtype=torch.float32, device=GPUdevice)
+            mask_prompt = pack['mask_prompt'].to(dtype=torch.float32, device=GPUdevice)#Dataset 里是 (1,256,256)，但 DataLoader 自动加了 batch 维
             name = pack['image_meta_dict']['filename_or_obj']
-
-            # mask_prompt: (B, 1, 256, 256)
-            # resize for loss
-            masks = F.interpolate(
-                mask_prompt,
-                size=(args.out_size, args.out_size),
-                mode="bilinear",
-                align_corners=False
-            )
 
             # ====================================================
             # 2. Freeze / unfreeze parameters
@@ -113,7 +105,7 @@ def train_sam(
                 lora.mark_only_lora_as_trainable(net.image_encoder)
                 if args.mod == 'sam_adalora':
                     rankallocator = lora.RankAllocator(
-                        net.image_encoder,
+                        net.mage_encoder,
                         lora_r=4,
                         target_rank=8,
                         init_warmup=500,
@@ -126,7 +118,7 @@ def train_sam(
             else:
                 for _, p in net.image_encoder.named_parameters():
                     p.requires_grad = True
-
+      
             # ====================================================
             # 3. Image encoder
             # ====================================================
@@ -188,6 +180,9 @@ def train_sam(
             )
 
             loss = lossfunc(pred, masks)
+            loss2=lossfunc(mask_prompt,masks)
+            print('mask prompt和gt的损失值：', loss2.item())
+            print('pre和gt的损失值：', loss.item())
             epoch_loss += loss.item()
 
             # ====================================================
@@ -218,7 +213,7 @@ def train_sam(
                     reverse=False
                 )
 
-            pbar.set_postfix({'loss': loss.item()})
+            pbar.set_postfix({'loss': loss.item()})#在进度条尾部动态显示当前迭代的 loss（损失值），让训练过程更直观
             pbar.update()
 
     return epoch_loss / len(train_loader)
@@ -260,18 +255,12 @@ def validation_sam(
                 # 1. Load data (NEW FORMAT)
                 # ====================================================
                 imgs = pack['image'].to(dtype=torch.float32, device=GPUdevice)
+                masks = pack['label'].to(dtype=torch.float32, device=GPUdevice)
                 mask_prompt = pack['mask_prompt'].to(dtype=torch.float32, device=GPUdevice)
                 name = pack['image_meta_dict']['filename_or_obj']
 
                 cur_bsz = imgs.shape[0]
 
-                # resize GT for loss / metrics
-                masks = F.interpolate(
-                    mask_prompt,
-                    size=(args.out_size, args.out_size),
-                    mode="bilinear",
-                    align_corners=False
-                )
 
                 # ====================================================
                 # 2. Forward
@@ -329,6 +318,9 @@ def validation_sam(
                 )
 
                 loss = lossfunc(pred, masks)
+                # loss2=lossfunc(mask_prompt,masks)
+                # print('mask prompt和gt的损失值：', loss2.item())
+                # print('pre和gt的损失值：', loss.item())
                 tot_loss += loss.item() * cur_bsz
 
                 # ====================================================

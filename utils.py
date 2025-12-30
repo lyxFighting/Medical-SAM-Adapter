@@ -1237,3 +1237,30 @@ def random_box(multi_rater):
 
     return x_min, x_max, y_min, y_max
 
+def weakmask(mask):
+    # 1. resize to 256×256 (SAM requirement)
+    mask_prompt = F.interpolate(
+        mask.unsqueeze(0),  #增加batch维度      # (1, 1, H, W)
+        size=(256, 256),
+        mode="bilinear",
+        align_corners=False
+    )
+
+    # 2. blur / coarsen
+    mask_prompt = F.avg_pool2d(
+        mask_prompt,
+        kernel_size=8,
+        stride=8
+    )
+    mask_prompt = F.interpolate(
+        mask_prompt,
+        size=(256, 256),
+        mode="bilinear",
+        align_corners=False
+    )
+
+    # 3. threshold → coarse mask
+    mask_prompt = (mask_prompt > 0.3).float()
+    mask_prompt = mask_prompt.squeeze(0)   # (1, 256, 256)
+    return mask_prompt
+
