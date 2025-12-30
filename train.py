@@ -38,13 +38,13 @@ from utils import *
 def main():
 
     args = cfg.parse_args()
-
+    
     seed = args.seed
     set_seed(seed)
 
     GPUdevice = torch.device('cuda', args.gpu_device)
 
-    net = get_network(args, args.net, use_gpu=args.gpu, gpu_device=GPUdevice, distribution = args.distributed)
+    net=SunetSam(config, args, GPUdevice)
     if args.pretrain:
         weights = torch.load(args.pretrain)
         net.load_state_dict(weights,strict=False)
@@ -109,7 +109,7 @@ def main():
 
         net.train()
         time_start = time.time()
-        loss = function.train_sam(args, net, optimizer, nice_train_loader, epoch, writer, vis = args.vis)
+        loss = function.train_sam(args, net, optimizer, nice_train_loader, epoch, writer, vis = args.vis,logger=logger)
         logger.info(f'Train loss: {loss} || @ epoch {epoch}.')
         time_end = time.time()
         print('time_for_training ', time_end - time_start)

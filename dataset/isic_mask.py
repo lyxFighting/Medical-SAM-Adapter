@@ -6,7 +6,7 @@ import torch
 from PIL import Image
 from torch.utils.data import Dataset
 
-from utils import random_box, random_click,weakmask
+from utils import random_box, random_click
 import torch.nn.functional as F
 
 
@@ -53,8 +53,8 @@ class ISIC2016(Dataset):
         # =====================================================
         # 🔥 Weak GT mask → SAM mask prompt
         # =====================================================
-        if self.prompt=='mask':
-            mask_prompt=weakmask(mask)
+        # if self.prompt=='mask':
+        #     mask_prompt=weakmask(mask)
 
         # ---------- meta ----------
         name = name.split('/')[-1].split(".jpg")[0]
@@ -63,6 +63,6 @@ class ISIC2016(Dataset):
         return {
             'image': img, # (3, H, W)
             'label': mask,                  
-            'mask_prompt': mask_prompt,     # (1, 256, 256)
+            # 'mask_prompt': mask_prompt,     # (1, 256, 256)
             'image_meta_dict': image_meta_dict,
         }

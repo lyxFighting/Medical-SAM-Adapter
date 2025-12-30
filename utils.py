@@ -87,7 +87,7 @@ def set_seed(seed):
     torch.backends.cudnn.benchmark = False
     os.environ['PYTHONHASHSEED'] = str(seed)
     
-def get_network(args, net, use_gpu=True, gpu_device = 0, distribution = True):
+def get_sam_network(args, net, use_gpu=True, gpu_device = 0, distribution = True):
     """ return given network
     """
 
@@ -1237,30 +1237,19 @@ def random_box(multi_rater):
 
     return x_min, x_max, y_min, y_max
 
-def weakmask(mask):
-    # 1. resize to 256×256 (SAM requirement)
-    mask_prompt = F.interpolate(
-        mask.unsqueeze(0),  #增加batch维度      # (1, 1, H, W)
-        size=(256, 256),
-        mode="bilinear",
-        align_corners=False
-    )
+from swinunet.networks.vision_transformer import SwinUnet as ViT_seg
+from swinunet.config import get_config
+config = get_config(args)
 
-    # 2. blur / coarsen
-    mask_prompt = F.avg_pool2d(
-        mask_prompt,
-        kernel_size=8,
-        stride=8
-    )
-    mask_prompt = F.interpolate(
-        mask_prompt,
-        size=(256, 256),
-        mode="bilinear",
-        align_corners=False
-    )
+class SunetSam(nn.Module):
+    def __init__(self, config, args, GPUdevice):
+        super(SunetSam, self).__init__()
+        
+        # 定义 Swin-Unet 模型
+        self.swinunet = ViT_seg(config, img_size=args.image_size, num_classes=1).to(GPUdevice)
 
-    # 3. threshold → coarse mask
-    mask_prompt = (mask_prompt > 0.3).float()
-    mask_prompt = mask_prompt.squeeze(0)   # (1, 256, 256)
-    return mask_prompt
+        # 定义 SAM 模型
+        self.sam = get_sam_network(args, args.net, use_gpu=args.gpu, gpu_device=GPUdevice, distribution=args.distributed)
+
+
 

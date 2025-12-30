@@ -39,6 +39,7 @@ def parse_args():
     parser.add_argument('-distributed', default='none' ,type=str,help='multi GPU ids to use')
     parser.add_argument('-dataset', default='isic' ,type=str,help='dataset name')
     parser.add_argument('-sam_ckpt', default='/home/liuyuxiu/models/Medical-SAM-Adapter/checkpoints/sam/sam_vit_b_01ec64.pth' , help='sam checkpoint address')
+    parser.add_argument('-swin_ckpt', default='/home/liuyuxiu/models/Medical-SAM-Adapter/checkpoints/sam/swin_tiny_patch4_window7_224.pth' , help='swinunet checkpoint address')
     parser.add_argument('-thd', type=bool, default=False , help='3d or not')
     parser.add_argument('-chunk', type=int, default=None , help='crop volume depth')
     parser.add_argument('-num_sample', type=int, default=4 , help='sample pos and neg')
@@ -53,6 +54,26 @@ def parse_args():
     help='The path of segmentation data')
     # '../dataset/RIGA/DiscRegion'
     # '../dataset/ISIC'
+    # ===== swinunet/config.py 所需参数 =====
+    parser.add_argument('--opts', default=None, nargs='+')
+    parser.add_argument('--zip', action='store_true')
+    parser.add_argument('--cache-mode', type=str, default='part',
+                        choices=['no', 'full', 'part'])
+    parser.add_argument('--resume', help='resume from checkpoint')
+    parser.add_argument('--accumulation-steps', type=int)
+    parser.add_argument('--use-checkpoint', action='store_true')
+    parser.add_argument('--amp-opt-level', type=str, default='O1',
+                        choices=['O0', 'O1', 'O2'])
+    parser.add_argument('--tag', help='tag of experiment')
+    parser.add_argument('--eval', action='store_true')
+    parser.add_argument('--throughput', action='store_true')
+    parser.add_argument(
+        '--cfg',
+        type=str,
+        default='/home/liuyuxiu/models/Medical-SAM-Adapter/swinunet/configs/swin_tiny_patch4_window7_224_lite.yaml',
+        help='path to config file'
+    )
+
     opt = parser.parse_args()
 
     return opt

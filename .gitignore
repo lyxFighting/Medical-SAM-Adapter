@@ -6,3 +6,10 @@ pipline.sh
 # Python cache
 __pycache__/
 *.pyc
+/data/
+/model_output/
+/pretrained_ckpt/
+*.pthmodel_output/
+pretrained_ckpt/
+*.pth
+

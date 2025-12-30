@@ -66,7 +66,8 @@ def train_sam(
     epoch,
     writer,
     schedulers=None,
-    vis=50
+    vis=50,
+    logger=None
 ):
     net.train()
     optimizer.zero_grad()
@@ -89,23 +90,28 @@ def train_sam(
             # ====================================================
             # 1. Load data (NEW FORMAT)
             # ====================================================
-            imgs = pack['image'].to(dtype=torch.float32, device=GPUdevice)
+            imgs = pack['image'].to(dtype=torch.float32, device=GPUdevice)#(2,3,1024,1024)
             masks = pack['label'].to(dtype=torch.float32, device=GPUdevice)
-            mask_prompt = pack['mask_prompt'].to(dtype=torch.float32, device=GPUdevice)#Dataset 里是 (1,256,256)，但 DataLoader 自动加了 batch 维
+            resize_transform = transforms.Resize((224, 224))
+            imgs_resized = torch.stack([resize_transform(img) for img in imgs])#(2,3,224,224)
+            mask_prompts = net.swinunet(imgs_resized).to(dtype=torch.float32, device=GPUdevice)#(2,1,224,224)
+            resize_transform2 = transforms.Resize((256, 256))
+            mask_prompt = torch.stack([resize_transform2(mask_prompt) for mask_prompt in mask_prompts])
             name = pack['image_meta_dict']['filename_or_obj']
 
             # ====================================================
             # 2. Freeze / unfreeze parameters
             # ====================================================
             if args.mod == 'sam_adpt':
-                for n, p in net.image_encoder.named_parameters():
-                    p.requires_grad = ("Adapter" in n)
+                for n, value in net.sam.image_encoder.named_parameters(): 
+                    if "Adapter" not in n:
+                        value.requires_grad = False
             elif args.mod in ['sam_lora', 'sam_adalora']:
                 from models.common import loralib as lora
-                lora.mark_only_lora_as_trainable(net.image_encoder)
+                lora.mark_only_lora_as_trainable(net.sam.image_encoder)
                 if args.mod == 'sam_adalora':
                     rankallocator = lora.RankAllocator(
-                        net.mage_encoder,
+                        net.sam.image_encoder,
                         lora_r=4,
                         target_rank=8,
                         init_warmup=500,
@@ -116,28 +122,28 @@ def train_sam(
                         beta2=0.85,
                     )
             else:
-                for _, p in net.image_encoder.named_parameters():
+                for _, p in net.sam.image_encoder.named_parameters():
                     p.requires_grad = True
       
             # ====================================================
             # 3. Image encoder
             # ====================================================
             origin_imgs = imgs.clone()
-            imgs = net.preprocess(imgs)
-            image_embeddings = net.image_encoder(imgs)
+            imgs = net.sam.preprocess(imgs)
+            image_embeddings = net.sam.image_encoder(imgs)
 
             # ====================================================
             # 4. Prompt encoder (🔥 mask prompt only)
             # ====================================================
             with torch.no_grad():
                 if args.net in ['sam', 'mobile_sam']:
-                    se, de = net.prompt_encoder(
+                    se, de = net.sam.prompt_encoder(
                         points=None,
                         boxes=None,
                         masks=mask_prompt,
                     )
                 elif args.net == 'efficient_sam':
-                    se = net.prompt_encoder(
+                    se = net.sam.prompt_encoder(
                         masks=mask_prompt,
                     )
 
@@ -145,26 +151,26 @@ def train_sam(
             # 5. Mask decoder
             # ====================================================
             if args.net == 'sam':
-                pred, _ = net.mask_decoder(
+                pred, _ = net.sam.mask_decoder(
                     image_embeddings=image_embeddings,
-                    image_pe=net.prompt_encoder.get_dense_pe(),
+                    image_pe=net.sam.prompt_encoder.get_dense_pe(),
                     sparse_prompt_embeddings=se,
                     dense_prompt_embeddings=de,
                     multimask_output=(args.multimask_output > 1),
                 )
             elif args.net == 'mobile_sam':
-                pred, _ = net.mask_decoder(
+                pred, _ = net.sam.mask_decoder(
                     image_embeddings=image_embeddings,
-                    image_pe=net.prompt_encoder.get_dense_pe(),
+                    image_pe=net.sam.prompt_encoder.get_dense_pe(),
                     sparse_prompt_embeddings=se,
                     dense_prompt_embeddings=de,
                     multimask_output=False,
                 )
             elif args.net == 'efficient_sam':
                 se = se.view(se.shape[0], 1, se.shape[1], se.shape[2])
-                pred, _ = net.mask_decoder(
+                pred, _ = net.sam.mask_decoder(
                     image_embeddings=image_embeddings,
-                    image_pe=net.prompt_encoder.get_dense_pe(),
+                    image_pe=net.sam.prompt_encoder.get_dense_pe(),
                     sparse_prompt_embeddings=se,
                     multimask_output=False,
                 )
@@ -181,8 +187,9 @@ def train_sam(
 
             loss = lossfunc(pred, masks)
             loss2=lossfunc(mask_prompt,masks)
-            print('mask prompt和gt的损失值：', loss2.item())
-            print('pre和gt的损失值：', loss.item())
+            logger.info(f'mask prompt和gt的损失值：{loss2.item()}') 
+            logger.info(f'pre和gt的损失值：{loss.item()}') 
+
             epoch_loss += loss.item()
 
             # ====================================================
@@ -256,7 +263,11 @@ def validation_sam(
                 # ====================================================
                 imgs = pack['image'].to(dtype=torch.float32, device=GPUdevice)
                 masks = pack['label'].to(dtype=torch.float32, device=GPUdevice)
-                mask_prompt = pack['mask_prompt'].to(dtype=torch.float32, device=GPUdevice)
+                resize_transform = transforms.Resize((224, 224))
+                imgs_resized = torch.stack([resize_transform(img) for img in imgs])#(2,3,224,224)
+                mask_prompts = net.swinunet(imgs_resized).to(dtype=torch.float32, device=GPUdevice)#(2,1,224,224)
+                resize_transform2 = transforms.Resize((256, 256))
+                mask_prompt = torch.stack([resize_transform2(mask_prompt) for mask_prompt in mask_prompts])
                 name = pack['image_meta_dict']['filename_or_obj']
 
                 cur_bsz = imgs.shape[0]
@@ -266,43 +277,43 @@ def validation_sam(
                 # 2. Forward
                 # ====================================================
                 origin_imgs = imgs.clone()
-                imgs = net.preprocess(imgs)
-                image_embeddings = net.image_encoder(imgs)
+                imgs = net.sam.preprocess(imgs)
+                image_embeddings = net.sam.image_encoder(imgs)
 
                 # -------- prompt encoder (mask only) --------
                 if args.net in ['sam', 'mobile_sam']:
-                    se, de = net.prompt_encoder(
+                    se, de = net.sam.prompt_encoder(
                         points=None,
                         boxes=None,
                         masks=mask_prompt,
                     )
                 elif args.net == "efficient_sam":
-                    se = net.prompt_encoder(
+                    se = net.sam.prompt_encoder(
                         masks=mask_prompt,
                     )
 
                 # -------- mask decoder --------
                 if args.net == 'sam':
-                    pred, _ = net.mask_decoder(
+                    pred, _ = net.sam.mask_decoder(
                         image_embeddings=image_embeddings,
-                        image_pe=net.prompt_encoder.get_dense_pe(),
+                        image_pe=net.sam.prompt_encoder.get_dense_pe(),
                         sparse_prompt_embeddings=se,
                         dense_prompt_embeddings=de,
                         multimask_output=(args.multimask_output > 1),
                     )
                 elif args.net == 'mobile_sam':
-                    pred, _ = net.mask_decoder(
+                    pred, _ = net.sam.mask_decoder(
                         image_embeddings=image_embeddings,
-                        image_pe=net.prompt_encoder.get_dense_pe(),
+                        image_pe=net.sam.prompt_encoder.get_dense_pe(),
                         sparse_prompt_embeddings=se,
                         dense_prompt_embeddings=de,
                         multimask_output=False,
                     )
                 elif args.net == "efficient_sam":
                     se = se.view(se.shape[0], 1, se.shape[1], se.shape[2])
-                    pred, _ = net.mask_decoder(
+                    pred, _ = net.sam.mask_decoder(
                         image_embeddings=image_embeddings,
-                        image_pe=net.prompt_encoder.get_dense_pe(),
+                        image_pe=net.sam.prompt_encoder.get_dense_pe(),
                         sparse_prompt_embeddings=se,
                         multimask_output=False,
                     )
