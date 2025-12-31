@@ -193,7 +193,8 @@ def train_sam(args, net: nn.Module, optimizer, train_loader,
                 
             # Resize to the ordered output size
             pred = F.interpolate(pred,size=(args.out_size,args.out_size), mode="bilinear", align_corners=False)
-
+            print("pred:", judge_mask_type(pred))
+            print("masks:", judge_mask_type(masks))
             loss = lossfunc(pred, masks)
 
             pbar.set_postfix(**{'loss (batch)': loss.item()})

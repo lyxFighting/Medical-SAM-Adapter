@@ -961,6 +961,15 @@ def hook_model(model, image_f):
         return out
 
     return hook
+def judge_mask_type(mask):
+    mn, mx = mask.min().item(), mask.max().item()
+    uniq = torch.unique(mask)
+    
+    if mn < 0 or mx > 1:
+        return "logits mask"
+    if uniq.numel() <= 2:
+        return "binary mask"
+    return "soft mask (prob)"
 
 def vis_image(imgs, pred_masks, gt_masks, save_path, reverse = False, points = None, boxes = None):
     
