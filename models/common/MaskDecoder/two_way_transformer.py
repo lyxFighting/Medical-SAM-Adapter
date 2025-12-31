@@ -58,9 +58,9 @@ class TwoWayTransformer(nn.Module):
 
     def forward(
         self,
-        image_embedding: Tensor,
+        image_embedding: Tensor,#结合了de和image_embeddings
         image_pe: Tensor,
-        point_embedding: Tensor,
+        point_embedding: Tensor,#se
     ) -> Tuple[Tensor, Tensor]:
         """
         Args:

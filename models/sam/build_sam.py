@@ -59,10 +59,10 @@ sam_model_registry = {
 
 def _build_sam(
     args,
-    encoder_embed_dim,
-    encoder_depth,
-    encoder_num_heads,
-    encoder_global_attn_indexes,
+    encoder_embed_dim,#768,
+    encoder_depth,#12,
+    encoder_num_heads,#12,
+    encoder_global_attn_indexes,#[2, 5, 8, 11],
     checkpoint=None,
 ):
     prompt_embed_dim = 256

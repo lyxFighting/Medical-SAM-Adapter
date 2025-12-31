@@ -68,7 +68,7 @@ class PromptEncoder(nn.Module):
           torch.Tensor: Positional encoding with shape
             1x(embed_dim)x(embedding_h)x(embedding_w)
         """
-        return self.pe_layer(self.image_embedding_size).unsqueeze(0)
+        return self.pe_layer(self.image_embedding_size).unsqueeze(0)#(64,64,)
 
     def _embed_points(
         self,
@@ -179,17 +179,17 @@ class PositionEmbeddingRandom(nn.Module):
             scale = 1.0
         self.register_buffer(
             "positional_encoding_gaussian_matrix",
-            scale * torch.randn((2, num_pos_feats)),
+            scale * torch.randn((2, num_pos_feats)),#(2,128)
         )
 
     def _pe_encoding(self, coords: torch.Tensor) -> torch.Tensor:
         """Positionally encode points that are normalized to [0,1]."""
         # assuming coords are in [0, 1]^2 square and have d_1 x ... x d_n x 2 shape
-        coords = 2 * coords - 1
-        coords = coords @ self.positional_encoding_gaussian_matrix
+        coords = 2 * coords - 1#(64,64,2)
+        coords = coords @ self.positional_encoding_gaussian_matrix#(64,64,128)
         coords = 2 * np.pi * coords
         # outputs d_1 x ... x d_n x C shape
-        return torch.cat([torch.sin(coords), torch.cos(coords)], dim=-1)
+        return torch.cat([torch.sin(coords), torch.cos(coords)], dim=-1)#(64,64,256)
 
     def forward(self, size: Tuple[int, int]) -> torch.Tensor:
         """Generate positional encoding for a grid of the specified size."""
@@ -198,11 +198,11 @@ class PositionEmbeddingRandom(nn.Module):
         grid = torch.ones((h, w), device=device, dtype=torch.float32)
         y_embed = grid.cumsum(dim=0) - 0.5
         x_embed = grid.cumsum(dim=1) - 0.5
-        y_embed = y_embed / h
+        y_embed = y_embed / h#(64,64)
         x_embed = x_embed / w
 
         pe = self._pe_encoding(torch.stack([x_embed, y_embed], dim=-1))
-        return pe.permute(2, 0, 1)  # C x H x W
+        return pe.permute(2, 0, 1)  # C x H x W(256,64,64)
 
     def forward_with_coords(
         self, coords_input: torch.Tensor, image_size: Tuple[int, int]

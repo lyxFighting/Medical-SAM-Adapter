@@ -91,12 +91,15 @@ def train_sam(
             # 1. Load data (NEW FORMAT)
             # ====================================================
             imgs = pack['image'].to(dtype=torch.float32, device=GPUdevice)#(2,3,1024,1024)
-            masks = pack['label'].to(dtype=torch.float32, device=GPUdevice)
+            masks = pack['label'].to(dtype=torch.float32, device=GPUdevice)#(2,1,256,256)
+            print("\ngt_masks:", judge_mask_type(masks))
             resize_transform = transforms.Resize((224, 224))
             imgs_resized = torch.stack([resize_transform(img) for img in imgs])#(2,3,224,224)
             mask_prompts = net.swinunet(imgs_resized).to(dtype=torch.float32, device=GPUdevice)#(2,1,224,224)
             resize_transform2 = transforms.Resize((256, 256))
-            mask_prompt = torch.stack([resize_transform2(mask_prompt) for mask_prompt in mask_prompts])
+            mask_prompts_resized  = torch.stack([resize_transform2(mask_prompt) for mask_prompt in mask_prompts])#(2,1,256,256)
+            print("swinunet out:", judge_mask_type(mask_prompts_resized))
+            mask_prompts_soft = torch.sigmoid(mask_prompts_resized)
             name = pack['image_meta_dict']['filename_or_obj']
 
             # ====================================================
@@ -128,9 +131,9 @@ def train_sam(
             # ====================================================
             # 3. Image encoder
             # ====================================================
-            origin_imgs = imgs.clone()
+            origin_imgs = imgs.clone()#(2,3,1024,1024)
             imgs = net.sam.preprocess(imgs)
-            image_embeddings = net.sam.image_encoder(imgs)
+            image_embeddings = net.sam.image_encoder(imgs)#(2,256,64,64)
 
             # ====================================================
             # 4. Prompt encoder (🔥 mask prompt only)
@@ -140,11 +143,11 @@ def train_sam(
                     se, de = net.sam.prompt_encoder(
                         points=None,
                         boxes=None,
-                        masks=mask_prompt,
-                    )
+                        masks=mask_prompts_soft ,#(2,1,256,256)
+                    )#(2,0,256),(2,256,64,64)
                 elif args.net == 'efficient_sam':
                     se = net.sam.prompt_encoder(
-                        masks=mask_prompt,
+                        masks=mask_prompts_soft ,
                     )
 
             # ====================================================
@@ -152,12 +155,12 @@ def train_sam(
             # ====================================================
             if args.net == 'sam':
                 pred, _ = net.sam.mask_decoder(
-                    image_embeddings=image_embeddings,
-                    image_pe=net.sam.prompt_encoder.get_dense_pe(),
-                    sparse_prompt_embeddings=se,
-                    dense_prompt_embeddings=de,
+                    image_embeddings=image_embeddings,#(2,256,64,64)
+                    image_pe=net.sam.prompt_encoder.get_dense_pe(),#(1,256,64,64)
+                    sparse_prompt_embeddings=se,#(2,0,256)
+                    dense_prompt_embeddings=de,#(2,256,64,64)
                     multimask_output=(args.multimask_output > 1),
-                )
+                )#(2,1,256,256)
             elif args.net == 'mobile_sam':
                 pred, _ = net.sam.mask_decoder(
                     image_embeddings=image_embeddings,
@@ -178,18 +181,18 @@ def train_sam(
             # ====================================================
             # 6. Resize + loss
             # ====================================================
+            print("sam.mask_decoder out:", judge_mask_type(pred))
             pred = F.interpolate(
                 pred,
                 size=(args.out_size, args.out_size),
                 mode="bilinear",
                 align_corners=False
             )
+            print("pred:", judge_mask_type(pred))
+            print("gt_masks:", judge_mask_type(masks))
 
-            loss = lossfunc(pred, masks)
-            loss2=lossfunc(mask_prompt,masks)
-            logger.info(f'mask prompt和gt的损失值：{loss2.item()}') 
-            logger.info(f'pre和gt的损失值：{loss.item()}') 
-
+            loss = lossfunc(torch.sigmoid(pred), masks)
+            loss2=lossfunc(mask_prompts_soft ,masks)
             epoch_loss += loss.item()
 
             # ====================================================
@@ -210,9 +213,10 @@ def train_sam(
             # ====================================================
             if vis and ind % vis == 0:
                 vis_image(
-                    origin_imgs / 255,
-                    pred,
-                    masks,
+                    origin_imgs / 255,#（2,3,1024,1024）
+                    mask_prompts_resized ,#(2,1,256,256)logits
+                    pred,#(2,1,256,256)logits
+                    masks,#(2,1,256,256)soft mask
                     os.path.join(
                         args.path_helper['sample_path'],
                         f"Train_{name}_epoch_{epoch}.jpg"
@@ -352,6 +356,7 @@ def validation_sam(
 
                     vis_image(
                         origin_imgs / 255,
+                        # mask_prompt,
                         pred,
                         masks,
                         os.path.join(
