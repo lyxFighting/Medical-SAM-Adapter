@@ -962,44 +962,56 @@ def hook_model(model, image_f):
 
     return hook
 
-def vis_image(imgs, pred_masks, gt_masks, save_path, reverse = False, points = None, boxes = None):
-    
+def vis_image(imgs, prompt_masks,pred_masks,gt_masks, save_path, reverse = False, points = None, boxes = None):
+
     b,c,h,w = pred_masks.size()
     dev = pred_masks.get_device()
     row_num = min(b, 4)
 
+    if torch.max(prompt_masks) > 1 or torch.min(prompt_masks) < 0:
+        prompt_masks = torch.sigmoid(prompt_masks)
     if torch.max(pred_masks) > 1 or torch.min(pred_masks) < 0:
         pred_masks = torch.sigmoid(pred_masks)
-
+    prompt_masks=prompt_masks.round().float()
+    pred_masks=pred_masks.round().float()
+    
     if reverse == True:
+        prompt_masks= 1 - prompt_masks
         pred_masks = 1 - pred_masks
         gt_masks = 1 - gt_masks
     else:
+        prompt_masks= prompt_masks.clone()
         pred_masks = pred_masks.clone()
         gt_masks = gt_masks.clone()
     if c == 2: # for REFUGE multi mask output
+        prompt_disc, prompt_cup = prompt_masks[:,0,:,:].unsqueeze(1).expand(b,3,h,w), prompt_masks[:,1,:,:].unsqueeze(1).expand(b,3,h,w)
         pred_disc, pred_cup = pred_masks[:,0,:,:].unsqueeze(1).expand(b,3,h,w), pred_masks[:,1,:,:].unsqueeze(1).expand(b,3,h,w)
         gt_disc, gt_cup = gt_masks[:,0,:,:].unsqueeze(1).expand(b,3,h,w), gt_masks[:,1,:,:].unsqueeze(1).expand(b,3,h,w)
-        tup = (imgs[:row_num,:,:,:],pred_disc[:row_num,:,:,:], pred_cup[:row_num,:,:,:], gt_disc[:row_num,:,:,:], gt_cup[:row_num,:,:,:])
+        tup = (imgs[:row_num,:,:,:], prompt_disc[:row_num,:,:,:], prompt_cup[:row_num,:,:,:], pred_disc[:row_num,:,:,:], pred_cup[:row_num,:,:,:], gt_disc[:row_num,:,:,:], gt_cup[:row_num,:,:,:])
         compose = torch.cat(tup, 0)
         vutils.save_image(compose, fp = save_path, nrow = row_num, padding = 10)
     elif c > 2: # for multi-class segmentation > 2 classes
+        prompts= []
         preds = []
         gts = []
         for i in range(0, c):
+            prompt = prompt_masks[:,i,:,:].unsqueeze(1).expand(b,3,h,w)
+            prompts.append(prompt)
             pred = pred_masks[:,i,:,:].unsqueeze(1).expand(b,3,h,w)
             preds.append(pred)
             gt = gt_masks[:,i,:,:].unsqueeze(1).expand(b,3,h,w)
             gts.append(gt)
-        tup = [imgs[:row_num,:,:,:]] + preds + gts
+        tup = [imgs[:row_num,:,:,:]] + prompts + preds + gts
         compose = torch.cat(tup,0)
         vutils.save_image(compose, fp = save_path, nrow = row_num, padding = 10)
     else:
         imgs = torchvision.transforms.Resize((h,w))(imgs)
         if imgs.size(1) == 1:
             imgs = imgs[:,0,:,:].unsqueeze(1).expand(b,3,h,w)
+        prompt_masks = prompt_masks[:,0,:,:].unsqueeze(1).expand(b,3,h,w)
         pred_masks = pred_masks[:,0,:,:].unsqueeze(1).expand(b,3,h,w)
         gt_masks = gt_masks[:,0,:,:].unsqueeze(1).expand(b,3,h,w)
+
         if points != None:
             for i in range(b):
                 if args.thd:
@@ -1021,7 +1033,11 @@ def vis_image(imgs, pred_masks, gt_masks, save_path, reverse = False, points = N
                 img01 = img255 / 255
                 # torchvision.utils.save_image(img01, save_path + "_boxes.png")
                 imgs[i, :] = img01
-        tup = (imgs[:row_num,:,:,:],pred_masks[:row_num,:,:,:], gt_masks[:row_num,:,:,:])
+        # print("prompt_masks:", judge_mask_type(prompt_masks))
+        # print("pred:", judge_mask_type(pred_masks))
+        # print("gt_masks:", judge_mask_type(gt_masks))
+        
+        tup = (imgs[:row_num,:,:,:],prompt_masks[:row_num,:,:,:], pred_masks[:row_num,:,:,:], gt_masks[:row_num,:,:,:])
         # compose = torch.cat((imgs[:row_num,:,:,:],pred_disc[:row_num,:,:,:], pred_cup[:row_num,:,:,:], gt_disc[:row_num,:,:,:], gt_cup[:row_num,:,:,:]),0)
         compose = torch.cat(tup,0)
         vutils.save_image(compose, fp = save_path, nrow = row_num, padding = 10)
