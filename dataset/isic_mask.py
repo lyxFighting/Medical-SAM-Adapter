@@ -8,7 +8,7 @@ from torch.utils.data import Dataset
 
 from utils import random_box, random_click
 import torch.nn.functional as F
-
+from utils import *
 
 class ISIC2016(Dataset):
     def __init__(self, args, data_path , transform = None, transform_msk = None, mode = 'Training',prompt = 'mask', plane = False):
@@ -48,7 +48,7 @@ class ISIC2016(Dataset):
         if self.transform:
             img = self.transform(img)
         if self.transform_msk:
-            mask = self.transform_msk(mask)
+            mask = self.transform_msk(mask).int()#soft类型为什么int后不是全0？
 
         # =====================================================
         # 🔥 Weak GT mask → SAM mask prompt

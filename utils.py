@@ -977,14 +977,13 @@ def vis_image(imgs, prompt_masks,pred_masks,gt_masks, save_path, reverse = False
     dev = pred_masks.get_device()
     row_num = min(b, 4)
 
-    if torch.max(pred_masks) > 1 or torch.min(pred_masks) < 0:
-        pred_masks = torch.sigmoid(pred_masks)
     if torch.max(prompt_masks) > 1 or torch.min(prompt_masks) < 0:
         prompt_masks = torch.sigmoid(prompt_masks)
-    print("sam.mask_decoder out2 after sigmoid:", judge_mask_type(pred_masks))
-    print("swinunet out after sigmoid:", judge_mask_type(prompt_masks))
-
-
+    if torch.max(pred_masks) > 1 or torch.min(pred_masks) < 0:
+        pred_masks = torch.sigmoid(pred_masks)
+    prompt_masks=prompt_masks.round().float()
+    pred_masks=pred_masks.round().float()
+    
     if reverse == True:
         prompt_masks= 1 - prompt_masks
         pred_masks = 1 - pred_masks
@@ -1043,6 +1042,10 @@ def vis_image(imgs, prompt_masks,pred_masks,gt_masks, save_path, reverse = False
                 img01 = img255 / 255
                 # torchvision.utils.save_image(img01, save_path + "_boxes.png")
                 imgs[i, :] = img01
+        # print("prompt_masks:", judge_mask_type(prompt_masks))
+        # print("pred:", judge_mask_type(pred_masks))
+        # print("gt_masks:", judge_mask_type(gt_masks))
+        
         tup = (imgs[:row_num,:,:,:],prompt_masks[:row_num,:,:,:], pred_masks[:row_num,:,:,:], gt_masks[:row_num,:,:,:])
         # compose = torch.cat((imgs[:row_num,:,:,:],pred_disc[:row_num,:,:,:], pred_cup[:row_num,:,:,:], gt_disc[:row_num,:,:,:], gt_cup[:row_num,:,:,:]),0)
         compose = torch.cat(tup,0)
@@ -1269,8 +1272,8 @@ class SunetSam(nn.Module):
         super(SunetSam, self).__init__()
         
         # 定义 Swin-Unet 模型
-        self.swinunet = ViT_seg(config, img_size=args.image_size, num_classes=1).to(GPUdevice)
-
+        self.swinunet = ViT_seg(config,img_size=args.image_size, num_classes=1).to(GPUdevice)
+        self.swinunet.load_from(config)
         # 定义 SAM 模型
         self.sam = get_sam_network(args, args.net, use_gpu=args.gpu, gpu_device=GPUdevice, distribution=args.distributed)
 

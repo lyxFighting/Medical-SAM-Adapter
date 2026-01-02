@@ -24,7 +24,7 @@ from .wbc import WBC
 def get_dataloader(args):
     transform_train = transforms.Compose([
         transforms.Resize((args.image_size,args.image_size)),
-        transforms.ToTensor(),
+        transforms.ToTensor(),#int 类型的 mask 转换成 float32，同时也会归一化到 [0, 1]
         transforms.Lambda(lambda x: x * 255)
     ])
 
