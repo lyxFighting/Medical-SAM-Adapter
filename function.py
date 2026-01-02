@@ -204,6 +204,7 @@ def train_sam(
             if vis and ind % vis == 0:
                 vis_image(
                     origin_imgs / 255,
+                    mask_prompt,
                     pred,
                     masks,
                     os.path.join(
@@ -341,6 +342,7 @@ def validation_sam(
 
                     vis_image(
                         origin_imgs / 255,
+                        mask_prompt,
                         pred,
                         masks,
                         os.path.join(
