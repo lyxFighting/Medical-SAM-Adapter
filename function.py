@@ -35,6 +35,7 @@ import pytorch_ssim
 #from models.discriminatorlayer import discriminator
 from conf import settings
 from utils import *
+from swinunet.swin_predict import swinmask
 
 # from lucent.modelzoo.util import get_model_layers
 # from lucent.optvis import render, param, transform, objectives
@@ -92,7 +93,7 @@ def train_sam(
             # ====================================================
             imgs = pack['image'].to(dtype=torch.float32, device=GPUdevice)#(2,3,1024,1024)
             masks = pack['label'].to(dtype=torch.float32, device=GPUdevice)#(2,1,256,256)
-            mask_prompts=swinmask(imgs)
+            mask_prompts=swinmask(args,imgs)
             # resize_transform = transforms.Resize((224, 224))
             # imgs_resized = torch.stack([resize_transform(img) for img in imgs])#(2,3,224,224)
             # mask_prompts = net.swinunet(imgs_resized).to(dtype=torch.float32, device=GPUdevice)#(2,1,224,224)

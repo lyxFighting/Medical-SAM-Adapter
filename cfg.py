@@ -55,24 +55,32 @@ def parse_args():
     # '../dataset/RIGA/DiscRegion'
     # '../dataset/ISIC'
     # ===== swinunet/config.py 所需参数 =====
-    parser.add_argument('--opts', default=None, nargs='+')
+    parser.add_argument('--cfg',
+                        default='/home/liuyuxiu/models/Swin-Unet/configs/swin_tiny_patch4_window7_224_lite.yaml')
+    parser.add_argument('--checkpoint',
+                        default='/home/liuyuxiu/models/Swin-Unet/checkpoints/isic/best_model.pth')
+    parser.add_argument('--sam_ckpt',
+                        default='/home/liuyuxiu/models/segment-anything/checkpoints/sam_vit_b_01ec64.pth')
+
+    parser.add_argument('--input_image',
+                        default='/home/liuyuxiu/models/Medical-SAM-Adapter/data/ISIC/ISBI2016_ISIC_Part1_Test_Data/ISIC_0000003.jpg')
+
+    parser.add_argument('--output_dir', default='./outputs')
+    parser.add_argument('--img_size', type=int, default=224)
+    parser.add_argument('--num_classes', type=int, default=1)
+
+    # ===== config.py 必需参数 =====
+    parser.add_argument("--opts", default=None, nargs='+')
+    parser.add_argument('--batch_size', type=int, default=None)
     parser.add_argument('--zip', action='store_true')
-    parser.add_argument('--cache-mode', type=str, default='part',
-                        choices=['no', 'full', 'part'])
-    parser.add_argument('--resume', help='resume from checkpoint')
-    parser.add_argument('--accumulation-steps', type=int)
+    parser.add_argument('--cache-mode', default='part')
+    parser.add_argument('--resume', default=None)
+    parser.add_argument('--accumulation-steps', type=int, default=None)
     parser.add_argument('--use-checkpoint', action='store_true')
-    parser.add_argument('--amp-opt-level', type=str, default='O1',
-                        choices=['O0', 'O1', 'O2'])
-    parser.add_argument('--tag', help='tag of experiment')
+    parser.add_argument('--amp-opt-level', default='O1')
+    parser.add_argument('--tag', default=None)
     parser.add_argument('--eval', action='store_true')
     parser.add_argument('--throughput', action='store_true')
-    parser.add_argument(
-        '--cfg',
-        type=str,
-        default='/home/liuyuxiu/models/Medical-SAM-Adapter/swinunet/configs/swin_tiny_patch4_window7_224_lite.yaml',
-        help='path to config file'
-    )
 
     opt = parser.parse_args()
 
