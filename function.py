@@ -92,11 +92,15 @@ def train_sam(
             # ====================================================
             imgs = pack['image'].to(dtype=torch.float32, device=GPUdevice)#(2,3,1024,1024)
             masks = pack['label'].to(dtype=torch.float32, device=GPUdevice)#(2,1,256,256)
-            resize_transform = transforms.Resize((224, 224))
-            imgs_resized = torch.stack([resize_transform(img) for img in imgs])#(2,3,224,224)
-            mask_prompts = net.swinunet(imgs_resized).to(dtype=torch.float32, device=GPUdevice)#(2,1,224,224)
-            resize_transform2 = transforms.Resize((256, 256))
-            mask_prompts_resized  = torch.stack([resize_transform2(mask_prompt) for mask_prompt in mask_prompts])#(2,1,256,256)
+            mask_prompts=swinmask(imgs)
+            # resize_transform = transforms.Resize((224, 224))
+            # imgs_resized = torch.stack([resize_transform(img) for img in imgs])#(2,3,224,224)
+            # mask_prompts = net.swinunet(imgs_resized).to(dtype=torch.float32, device=GPUdevice)#(2,1,224,224)
+            # resize_transform2 = transforms.Resize((256, 256))
+            # mask_prompts_resized  = torch.stack([resize_transform2(mask_prompt) for mask_prompt in mask_prompts])#(2,1,256,256)
+
+
+
             name = pack['image_meta_dict']['filename_or_obj']
 
             # ====================================================

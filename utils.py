@@ -1278,4 +1278,104 @@ class SunetSam(nn.Module):
         self.sam = get_sam_network(args, args.net, use_gpu=args.gpu, gpu_device=GPUdevice, distribution=args.distributed)
 
 
+import os
+import sys
+import cv2
+import torch
+import numpy as np
+from PIL import Image
+import matplotlib.pyplot as plt
+from torchvision import transforms
+import argparse
 
+
+# ---------- 工具函数 ----------
+def load_image_swin(image_path, img_size):
+    transform = transforms.Compose([
+        transforms.Resize((img_size, img_size)),
+        transforms.ToTensor(),
+        transforms.Normalize(
+            mean=[0.485, 0.456, 0.406],
+            std=[0.229, 0.224, 0.225]
+        )
+    ])
+    img = Image.open(image_path).convert('RGB')
+    return transform(img).unsqueeze(0), np.array(img)
+
+
+# ---------- 主流程 ----------
+def swinmask(args,nput_image):
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--cfg',
+                        default='/home/liuyuxiu/models/Swin-Unet/configs/swin_tiny_patch4_window7_224_lite.yaml')
+    parser.add_argument('--checkpoint',
+                        default='/home/liuyuxiu/models/Swin-Unet/checkpoints/isic/best_model.pth')
+    parser.add_argument('--sam_ckpt',
+                        default='/home/liuyuxiu/models/segment-anything/checkpoints/sam_vit_b_01ec64.pth')
+
+    parser.add_argument('--img_size', type=int, default=224)
+    parser.add_argument('--num_classes', type=int, default=1)
+
+    # ===== config.py 必需参数 =====
+    parser.add_argument("--opts", default=None, nargs='+')
+    parser.add_argument('--batch_size', type=int, default=None)
+    parser.add_argument('--zip', action='store_true')
+    parser.add_argument('--cache-mode', default='part')
+    parser.add_argument('--resume', default=None)
+    parser.add_argument('--accumulation-steps', type=int, default=None)
+    parser.add_argument('--use-checkpoint', action='store_true')
+    parser.add_argument('--amp-opt-level', default='O1')
+    parser.add_argument('--tag', default=None)
+    parser.add_argument('--eval', action='store_true')
+    parser.add_argument('--throughput', action='store_true')
+
+    args = parser.parse_args()
+
+    model = ViT_seg(config,
+                    img_size=args.img_size,
+                    num_classes=args.num_classes).cuda()
+    # model.load_state_dict(torch.load(args.checkpoint, map_location='cpu'))
+    checkpoint = torch.load(args.checkpoint, map_location='cpu')
+
+    # 方法A：检查是否是检查点格式
+    if 'model_state_dict' in checkpoint:
+        model.load_state_dict(checkpoint['model_state_dict'])
+        print(f"成功加载检查点，epoch: {checkpoint.get('epoch', 'N/A')}")
+    else:
+        # 方法B：如果是纯权重文件
+        model.load_state_dict(checkpoint)
+    model.eval()
+
+    img_tensor, origin_img = load_image_swin(input_image, args.img_size)
+    img_tensor = img_tensor.cuda()
+
+    with torch.no_grad():
+        swin_pred = model(img_tensor)
+        swin_mask = swin_pred.squeeze().cpu().numpy()
+        # swin_mask = torch.sigmoid(swin_pred).squeeze().cpu().numpy()
+        # swin_mask = (swin_mask > 0.5).astype(np.uint8)
+        #resize 到原图尺寸（极其关键）
+        H, W, _ = origin_img.shape
+        swin_mask = cv2.resize(
+            swin_mask,
+            (W, H),
+            interpolation=cv2.INTER_NEAREST
+        )
+
+    cv2.imwrite(f"{args.output_dir}/1_swin_mask.png", swin_mask * 255)
+    # ===== 基于 U2Net mask 的黑底前景图（不经过 SAM）=====
+    # u2net_foreground = origin_img * swin_mask[..., None]
+
+    # cv2.imwrite(
+    #     os.path.join(args.output_dir, "2_swin_segmentation.png"),
+    #     cv2.cvtColor(u2net_foreground, cv2.COLOR_RGB2BGR)
+    # )
+
+    swin_vis = origin_img.copy()
+    swin_vis[swin_mask > 0] = swin_vis[swin_mask > 0] * 0.5 + np.array([255, 0, 0]) * 0.5
+    
+    cv2.imwrite(
+        os.path.join(args.output_dir, "2_swin_segmentation.png"),
+        cv2.cvtColor(swin_vis.astype(np.uint8), cv2.COLOR_RGB2BGR)
+    )
