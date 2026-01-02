@@ -11,7 +11,7 @@ def parse_args():
     parser.add_argument('-mod', type=str, default='sam_adpt', help='mod type:seg,cls,val_ad')
     parser.add_argument('-exp_name', default='msa_test_isic', type=str, help='net type')
     parser.add_argument('-type', type=str, default='map', help='condition type:ave,rand,rand_map')
-    parser.add_argument('-vis', type=int, default=1, help='visualization')
+    parser.add_argument('-vis', type=int, default=100, help='visualization')
     parser.add_argument('-reverse', type=bool, default=False, help='adversary reverse')
     parser.add_argument('-pretrain', type=bool, default=False, help='adversary reverse')
     parser.add_argument('-val_freq',type=int,default=5,help='interval between each validation')
@@ -53,6 +53,25 @@ def parse_args():
     help='The path of segmentation data')
     # '../dataset/RIGA/DiscRegion'
     # '../dataset/ISIC'
+    # ===== swin ===== 参数
+    parser.add_argument('--swin_img_size', type=int, default=224)
+    parser.add_argument('--cfg',
+                        default='/home/liuyuxiu/models/Medical-SAM-Adapter/swinunet/configs/swin_tiny_patch4_window7_224_lite.yaml')
+    parser.add_argument('--isiccheckpoint',
+                        default='/home/liuyuxiu/models/Swin-Unet/checkpoints/isic/best_model.pth')
+    parser.add_argument('--num_classes', type=int, default=1)
+
+    # ===== config.py 必需参数 =====
+    parser.add_argument("--opts", default=None, nargs='+')
+    parser.add_argument('--zip', action='store_true')
+    parser.add_argument('--cache-mode', default='part')
+    parser.add_argument('--resume', default=None)
+    parser.add_argument('--accumulation-steps', type=int, default=None)
+    parser.add_argument('--use-checkpoint', action='store_true')
+    parser.add_argument('--amp-opt-level', default='O1')
+    parser.add_argument('--tag', default=None)
+    parser.add_argument('--eval', action='store_true')
+    parser.add_argument('--throughput', action='store_true')
     opt = parser.parse_args()
 
     return opt

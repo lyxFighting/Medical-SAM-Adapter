@@ -35,6 +35,7 @@ import pytorch_ssim
 #from models.discriminatorlayer import discriminator
 from conf import settings
 from utils import *
+from swinunet.swin_predict import swinmask
 
 # from lucent.modelzoo.util import get_model_layers
 # from lucent.optvis import render, param, transform, objectives
@@ -66,7 +67,8 @@ def train_sam(
     epoch,
     writer,
     schedulers=None,
-    vis=50
+    vis=50,
+    logger=None
 ):
     net.train()
     optimizer.zero_grad()
@@ -91,7 +93,8 @@ def train_sam(
             # ====================================================
             imgs = pack['image'].to(dtype=torch.float32, device=GPUdevice)
             masks = pack['label'].to(dtype=torch.float32, device=GPUdevice)
-            mask_prompt = pack['mask_prompt'].to(dtype=torch.float32, device=GPUdevice)#Dataset 里是 (1,256,256)，但 DataLoader 自动加了 batch 维
+            mask_prompt = swinmask(args,imgs)
+            # mask_prompt = pack['mask_prompt'].to(dtype=torch.float32, device=GPUdevice)#Dataset 里是 (1,256,256)，但 DataLoader 自动加了 batch 维
             name = pack['image_meta_dict']['filename_or_obj']
 
             # ====================================================
@@ -181,8 +184,7 @@ def train_sam(
 
             loss = lossfunc(pred, masks)
             loss2=lossfunc(mask_prompt,masks)
-            print('mask prompt和gt的损失值：', loss2.item())
-            print('pre和gt的损失值：', loss.item())
+            logger.info(f'Batch {ind}, mask prompt和gt的损失值：{loss2.item()}, pre和gt的损失值：{loss.item()} || @ epoch {epoch}.')
             epoch_loss += loss.item()
 
             # ====================================================
@@ -257,7 +259,8 @@ def validation_sam(
                 # ====================================================
                 imgs = pack['image'].to(dtype=torch.float32, device=GPUdevice)
                 masks = pack['label'].to(dtype=torch.float32, device=GPUdevice)
-                mask_prompt = pack['mask_prompt'].to(dtype=torch.float32, device=GPUdevice)
+                mask_prompt = swinmask(args,imgs)
+                # mask_prompt = pack['mask_prompt'].to(dtype=torch.float32, device=GPUdevice)
                 name = pack['image_meta_dict']['filename_or_obj']
 
                 cur_bsz = imgs.shape[0]
