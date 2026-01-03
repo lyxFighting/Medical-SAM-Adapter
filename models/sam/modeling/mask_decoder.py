@@ -10,7 +10,8 @@ from torch.nn import functional as F
 
 from typing import List, Tuple, Type
 
-from ...common import LayerNorm2d
+from ...common import LayerNorm2d, KAN
+
 
 
 class MaskDecoder(nn.Module):
@@ -56,10 +57,16 @@ class MaskDecoder(nn.Module):
             nn.ConvTranspose2d(transformer_dim // 4, transformer_dim // 8, kernel_size=2, stride=2),
             activation(),
         )
-        self.output_hypernetworks_mlps = nn.ModuleList(
+        # self.output_hypernetworks_mlps = nn.ModuleList(
+        #     [
+        #         MLP(transformer_dim, transformer_dim, transformer_dim // 8, 3)
+        #         for i in range(self.num_mask_tokens)
+        #     ]
+        # )
+        self.output_kan = nn.ModuleList(
             [
-                MLP(transformer_dim, transformer_dim, transformer_dim // 8, 3)
-                for i in range(self.num_mask_tokens)
+                KAN([transformer_dim, transformer_dim // 2, transformer_dim // 8])
+                for _ in range(self.num_mask_tokens)
             ]
         )
 
@@ -137,7 +144,8 @@ class MaskDecoder(nn.Module):
         upscaled_embedding = self.output_upscaling(src)
         hyper_in_list: List[torch.Tensor] = []
         for i in range(self.num_mask_tokens):
-            hyper_in_list.append(self.output_hypernetworks_mlps[i](mask_tokens_out[:, i, :]))
+            # hyper_in_list.append(self.output_hypernetworks_mlps[i](mask_tokens_out[:, i, :]))
+            hyper_in_list.append(self.output_kan[i](mask_tokens_out[:, i, :]))
         hyper_in = torch.stack(hyper_in_list, dim=1)
         b, c, h, w = upscaled_embedding.shape
         masks = (hyper_in @ upscaled_embedding.view(b, c, h * w)).view(b, -1, h, w)
