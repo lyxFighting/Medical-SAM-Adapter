@@ -189,10 +189,11 @@ def train_sam(
                 align_corners=False
             )
  
-            loss = lossfunc(pred, masks)
-            loss2=lossfunc(mask_prompts ,masks)
+            loss1 = lossfunc(pred, masks)
+            loss2 = lossfunc(mask_prompts ,masks)
             print('mask prompt和gt的损失值：', loss2.item())
-            print('pre和gt的损失值：', loss.item())
+            print('pre和gt的损失值：', loss1.item())
+            loss= loss1+2*loss2
             epoch_loss += loss.item()
 
             # ====================================================
