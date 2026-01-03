@@ -27,7 +27,7 @@ def parse_args():
     parser.add_argument('-heads', type=int, default=16, help='heads number')
     parser.add_argument('-mlp_dim', type=int, default=1024, help='mlp_dim')
     parser.add_argument('-w', type=int, default=4, help='number of workers for dataloader')
-    parser.add_argument('-b', type=int, default=2, help='batch size for dataloader')
+    parser.add_argument('-b', type=int, default=1, help='batch size for dataloader')
     parser.add_argument('-s', type=bool, default=True, help='whether shuffle the dataset')
     parser.add_argument('-warm', type=int, default=1, help='warm up training phase')
     parser.add_argument('-lr', type=float, default=1e-4, help='initial learning rate')
@@ -56,22 +56,16 @@ def parse_args():
     # '../dataset/ISIC'
     # ===== swinunet/config.py 所需参数 =====
     parser.add_argument('--cfg',
-                        default='/home/liuyuxiu/models/Swin-Unet/configs/swin_tiny_patch4_window7_224_lite.yaml')
+                        default='/home/liuyuxiu/models/Medical-SAM-Adapter/swinunet/configs/swin_tiny_patch4_window7_224_lite.yaml')
     parser.add_argument('--checkpoint',
                         default='/home/liuyuxiu/models/Swin-Unet/checkpoints/isic/best_model.pth')
     parser.add_argument('--sam_ckpt',
                         default='/home/liuyuxiu/models/segment-anything/checkpoints/sam_vit_b_01ec64.pth')
-
-    parser.add_argument('--input_image',
-                        default='/home/liuyuxiu/models/Medical-SAM-Adapter/data/ISIC/ISBI2016_ISIC_Part1_Test_Data/ISIC_0000003.jpg')
-
-    parser.add_argument('--output_dir', default='./outputs')
     parser.add_argument('--img_size', type=int, default=224)
     parser.add_argument('--num_classes', type=int, default=1)
 
     # ===== config.py 必需参数 =====
     parser.add_argument("--opts", default=None, nargs='+')
-    parser.add_argument('--batch_size', type=int, default=None)
     parser.add_argument('--zip', action='store_true')
     parser.add_argument('--cache-mode', default='part')
     parser.add_argument('--resume', default=None)

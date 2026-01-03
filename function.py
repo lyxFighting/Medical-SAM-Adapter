@@ -35,7 +35,6 @@ import pytorch_ssim
 #from models.discriminatorlayer import discriminator
 from conf import settings
 from utils import *
-from swinunet.swin_predict import swinmask
 
 # from lucent.modelzoo.util import get_model_layers
 # from lucent.optvis import render, param, transform, objectives
@@ -93,12 +92,12 @@ def train_sam(
             # ====================================================
             imgs = pack['image'].to(dtype=torch.float32, device=GPUdevice)#(2,3,1024,1024)
             masks = pack['label'].to(dtype=torch.float32, device=GPUdevice)#(2,1,256,256)
-            mask_prompts=swinmask(args,imgs)
+            mask_prompts = net.swinunet(imgs).to(dtype=torch.float32, device=GPUdevice)
             # resize_transform = transforms.Resize((224, 224))
             # imgs_resized = torch.stack([resize_transform(img) for img in imgs])#(2,3,224,224)
             # mask_prompts = net.swinunet(imgs_resized).to(dtype=torch.float32, device=GPUdevice)#(2,1,224,224)
             # resize_transform2 = transforms.Resize((256, 256))
-            # mask_prompts_resized  = torch.stack([resize_transform2(mask_prompt) for mask_prompt in mask_prompts])#(2,1,256,256)
+            # mask_prompts  = torch.stack([resize_transform2(mask_prompt) for mask_prompt in mask_prompts])#(2,1,256,256)
 
 
 
@@ -145,11 +144,11 @@ def train_sam(
                     se, de = net.sam.prompt_encoder(
                         points=None,
                         boxes=None,
-                        masks=mask_prompts_resized ,#(2,1,256,256)
+                        masks=mask_prompts ,#(2,1,256,256)
                     )#(2,0,256),(2,256,64,64)
                 elif args.net == 'efficient_sam':
                     se = net.sam.prompt_encoder(
-                        masks=mask_prompts_resized ,
+                        masks=mask_prompts ,
                     )
 
             # ====================================================
@@ -191,7 +190,7 @@ def train_sam(
             )
  
             loss = lossfunc(pred, masks)
-            loss2=lossfunc(mask_prompts_resized ,masks)
+            loss2=lossfunc(mask_prompts ,masks)
             print('mask prompt和gt的损失值：', loss2.item())
             print('pre和gt的损失值：', loss.item())
             epoch_loss += loss.item()
@@ -215,7 +214,7 @@ def train_sam(
             if vis and ind % vis == 0:
                 vis_image(
                     origin_imgs / 255,#（2,3,1024,1024）
-                    mask_prompts_resized ,#(2,1,256,256)logits
+                    mask_prompts ,#(2,1,256,256)logits
                     pred,#(2,1,256,256)logits
                     masks,#(2,1,256,256)soft mask
                     os.path.join(
@@ -268,11 +267,13 @@ def validation_sam(
                 # ====================================================
                 imgs = pack['image'].to(dtype=torch.float32, device=GPUdevice)#(2,3,1024,1024)
                 masks = pack['label'].to(dtype=torch.float32, device=GPUdevice)#(2,1,256,256)
-                resize_transform = transforms.Resize((224, 224))
-                imgs_resized = torch.stack([resize_transform(img) for img in imgs])#(2,3,224,224)
-                mask_prompts = net.swinunet(imgs_resized).to(dtype=torch.float32, device=GPUdevice)#(2,1,224,224)
-                resize_transform2 = transforms.Resize((256, 256))
-                mask_prompts_resized  = torch.stack([resize_transform2(mask_prompt) for mask_prompt in mask_prompts])#(2,1,256,256)
+                mask_prompts = net.swinunet(imgs).to(dtype=torch.float32, device=GPUdevice)
+                # resize_transform = transforms.Resize((224, 224))
+                # imgs_resized = torch.stack([resize_transform(img) for img in imgs])#(2,3,224,224)
+                # mask_prompts = net.swinunet(imgs_resized).to(dtype=torch.float32, device=GPUdevice)#(2,1,224,224)
+                # resize_transform2 = transforms.Resize((256, 256))
+                # mask_prompts  = torch.stack([resize_transform2(mask_prompt) for mask_prompt in mask_prompts])#(2,1,256,256)
+                
                 name = pack['image_meta_dict']['filename_or_obj']
 
                 cur_bsz = imgs.shape[0]
@@ -290,11 +291,11 @@ def validation_sam(
                     se, de = net.sam.prompt_encoder(
                         points=None,
                         boxes=None,
-                        masks=mask_prompts_resized,
+                        masks=mask_prompts,
                     )
                 elif args.net == "efficient_sam":
                     se = net.sam.prompt_encoder(
-                        masks=mask_prompts_resized,
+                        masks=mask_prompts,
                     )
 
                 # -------- mask decoder --------
@@ -357,7 +358,7 @@ def validation_sam(
 
                     vis_image(
                         origin_imgs / 255,
-                        mask_prompts_resized,
+                        mask_prompts,
                         pred,
                         masks,
                         os.path.join(

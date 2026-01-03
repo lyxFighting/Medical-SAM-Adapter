@@ -3,7 +3,8 @@ import torch.nn as nn
 import torch.utils.checkpoint as checkpoint
 from einops import rearrange
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
-
+import torch.nn.functional as F
+from typing import Tuple
 
 class MoEFFNGating(nn.Module):
     def __init__(self, dim, hidden_dim, num_experts):
@@ -68,10 +69,43 @@ def window_reverse(windows, window_size, H, W):
     Returns:
         x: (B, H, W, C)
     """
-    B = int(windows.shape[0] / (H * W / window_size / window_size))
+    B = windows.shape[0] // (H * W // window_size // window_size)
     x = windows.view(B, H // window_size, W // window_size, window_size, window_size, -1)
     x = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(B, H, W, -1)
     return x
+
+def window_partition_with_pad(x, window_size):
+    """
+    x: (B, H, W, C)
+    return:
+        windows: (num_windows*B, window_size, window_size, C)
+        (Hp, Wp, H, W) for unpad
+    """
+    B, H, W, C = x.shape
+
+    pad_h = (window_size - H % window_size) % window_size
+    pad_w = (window_size - W % window_size) % window_size
+
+    if pad_h > 0 or pad_w > 0:
+        x = F.pad(x, (0, 0, 0, pad_w, 0, pad_h))
+
+    Hp, Wp = H + pad_h, W + pad_w
+
+    windows = window_partition(x, window_size)
+    return windows, (Hp, Wp)
+
+def window_unpartition(windows: torch.Tensor,window_size: int,pad_hw: Tuple[int, int],hw: Tuple[int, int],
+) -> torch.Tensor:
+    Hp, Wp = pad_hw
+    H, W = hw
+
+    x = window_reverse(windows, window_size, Hp, Wp)
+    # remove padding
+    if Hp > H or Wp > W:
+        x = x[:, :H, :W, :].contiguous()
+
+    return x
+
 
 
 class WindowAttention(nn.Module):
@@ -236,7 +270,7 @@ class SwinTransformerBlock(nn.Module):
                     cnt += 1
 
             #将掩码划分为窗口
-            mask_windows = window_partition(img_mask, self.window_size)  # nW, window_size, window_size, 1
+            mask_windows,hwp = window_partition_with_pad(img_mask, self.window_size)  # nW, window_size, window_size, 1
             mask_windows = mask_windows.view(-1, self.window_size * self.window_size)
             #计算窗口内的注意力掩码：同一区域为0，不同区域为-100，通俗理解：一个窗口可能包含原本不相邻的区域，掩码确保注意力只计算“原本相邻”的像素之间
             attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
@@ -263,7 +297,7 @@ class SwinTransformerBlock(nn.Module):
             shifted_x = x
 
         # partition windows分成多个window_size*window_size窗口
-        x_windows = window_partition(shifted_x, self.window_size)  # nW*B, window_size, window_size, C
+        x_windows,pad_hw = window_partition_with_pad(shifted_x, self.window_size)  # nW*B, window_size, window_size, C
         x_windows = x_windows.view(-1, self.window_size * self.window_size, C)  # nW*B, window_size*window_size, C
 
         # W-MSA/SW-MSA在每个窗口内计算注意力
@@ -271,7 +305,7 @@ class SwinTransformerBlock(nn.Module):
 
         # merge windows将窗口合并回特征图
         attn_windows = attn_windows.view(-1, self.window_size, self.window_size, C)
-        shifted_x = window_reverse(attn_windows, self.window_size, H, W)  # B H' W' C
+        shifted_x = window_unpartition(attn_windows, self.window_size, pad_hw, (H, W))  # B H' W' C
 
         # reverse cyclic shift如果是移动窗口，需要移回原位
         if self.shift_size > 0:
@@ -777,8 +811,14 @@ class SwinTransformerSys(nn.Module):
     def forward(self, x):
         x, x_downsample = self.forward_features(x)
         x = self.forward_up_features(x, x_downsample)
-        x = self.up_x4(x)
-
+        # x = self.up_x4(x)
+        H, W = self.patches_resolution
+        B, L, C = x.shape
+        assert L == H * W, "input features has wrong size"
+        x = x.view(B, H, W, -1)
+        x = x.permute(0, 3, 1, 2)  # B,C,H,W
+        x = self.output(x)
+        
         return x
 
     def flops(self):
