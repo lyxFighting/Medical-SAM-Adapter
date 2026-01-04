@@ -302,7 +302,7 @@ def validation_sam(
                 if args.net == 'sam':
                     pred, _ = net.sam.mask_decoder(
                         image_embeddings=image_embeddings,
-                        image_pe=net.sam.prompt_encoder.get_dense_pe(),
+                        image_pe=net.sam.prompt_encoder.get_dense_pe(),#get_dense_pe() 为 SAM 提供全图密集位置编码，弥补 Transformer 置换不变性的缺陷，赋予模型空间位置感知能力；
                         sparse_prompt_embeddings=se,
                         dense_prompt_embeddings=de,
                         multimask_output=(args.multimask_output > 1),
