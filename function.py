@@ -193,7 +193,7 @@ def train_sam(
             loss2 = lossfunc(mask_prompts ,masks)
             print('mask prompt和gt的损失值：', loss2.item())
             print('pre和gt的损失值：', loss1.item())
-            loss= loss1+2*loss2
+            loss= 0.1*loss1+0.9*loss2
             epoch_loss += loss.item()
 
             # ====================================================
