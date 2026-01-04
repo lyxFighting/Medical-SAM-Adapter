@@ -351,7 +351,7 @@ def validation_sam(
                 # 5. Visualization
                 # ====================================================
                 if args.vis and ind % args.vis == 0:
-                    namecat = "Val_"
+                    namecat = "Test"
                     for na in name[:2]:
                         img_name = na.split('/')[-1].split('.')[0]
                         namecat += img_name + '+'
