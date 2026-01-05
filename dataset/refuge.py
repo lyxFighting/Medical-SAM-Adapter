@@ -11,7 +11,7 @@ from utils import random_box, random_click
 
 
 class REFUGE(Dataset):
-    def __init__(self, args, data_path , transform = None, transform_msk = None, mode = 'Training',prompt = 'none', plane = False):
+    def __init__(self, args, data_path , transform = None, transform_msk = None, mode = 'Training',prompt = 'box', plane = False):
         self.data_path = data_path
         self.subfolders = [f.path for f in os.scandir(os.path.join(data_path, mode + '-400')) if f.is_dir()]
         self.mode = mode
