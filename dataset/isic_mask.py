@@ -43,7 +43,8 @@ class ISIC2016(Dataset):
         # resize mask to image size (for consistency)
         newsize = (self.img_size, self.img_size)
         mask = mask.resize(newsize)
-
+        point_label = 1
+        point_label, pt = random_click(np.array(mask) / 255, point_label)
         # ---------- transform ----------
         if self.transform:
             img = self.transform(img)
@@ -62,7 +63,9 @@ class ISIC2016(Dataset):
 
         return {
             'image': img, # (3, H, W)
-            'label': mask,                  
+            'label': mask,
+            'p_label':point_label,# 点提示的标签（前景点=1，背景点=0）
+            'pt':pt,# 形状: [N, 2]  # N个点，(x, y)坐标                  
             # 'mask_prompt': mask_prompt,     # (1, 256, 256)
             'image_meta_dict': image_meta_dict,
         }

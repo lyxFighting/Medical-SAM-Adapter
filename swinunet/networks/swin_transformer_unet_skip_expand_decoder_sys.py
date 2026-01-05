@@ -441,6 +441,40 @@ class FinalPatchExpand_X4(nn.Module):
         return x
 
 
+class FinalPatch_Fixed256(nn.Module):
+    def __init__(self, input_resolution, dim, norm_layer=nn.LayerNorm):
+        super().__init__()
+        self.input_resolution = input_resolution  # (H, W)
+        self.dim = dim
+        self.norm = norm_layer(dim)
+
+    def forward(self, x):
+        """
+        x: (B, H*W, C)
+        return: (B, 256*256, C)
+        """
+        H, W = self.input_resolution
+        B, L, C = x.shape
+        assert L == H * W, "input feature has wrong size"
+        assert C == self.dim
+
+        # (B, H*W, C) -> (B, C, H, W)
+        x = x.view(B, H, W, C).permute(0, 3, 1, 2)
+
+        # resize to 256x256
+        x = F.interpolate(
+            x,
+            size=(256, 256),
+            mode="bilinear",
+            align_corners=False
+        )
+
+        # (B, C, 256, 256) -> (B, 256*256, C)
+        x = x.permute(0, 2, 3, 1).reshape(B, 256 * 256, C)
+
+        x = self.norm(x)
+        return x
+
 class BasicLayer(nn.Module):
     """ A basic Swin Transformer layer for one stage.
 
@@ -744,6 +778,7 @@ class SwinTransformerSys(nn.Module):
             print("---final upsample expand_first---")
             self.up = FinalPatchExpand_X4(input_resolution=(img_size // patch_size, img_size // patch_size),
                                           dim_scale=4, dim=embed_dim)
+            self.fixed256 = FinalPatch_Fixed256(input_resolution=(img_size // patch_size, img_size // patch_size), dim=embed_dim)
             self.output = nn.Conv2d(in_channels=embed_dim, out_channels=self.num_classes, kernel_size=1, bias=False)
 
         self.apply(self._init_weights)
@@ -807,17 +842,21 @@ class SwinTransformerSys(nn.Module):
             x = self.output(x)
 
         return x
-
+    def final_fixed256(self, x):
+        H, W = self.patches_resolution
+        B, L, C = x.shape
+        assert L == H * W, "input features has wrong size"
+        x=self.fixed256(x)
+        x = x.view(B, H, W, -1)
+        x = x.permute(0, 3, 1, 2)  # B,C,H,W
+        x = self.output(x)
+        
+        return x
     def forward(self, x):
         x, x_downsample = self.forward_features(x)
         x = self.forward_up_features(x, x_downsample)
         # x = self.up_x4(x)
-        H, W = self.patches_resolution
-        B, L, C = x.shape
-        assert L == H * W, "input features has wrong size"
-        x = x.view(B, H, W, -1)
-        x = x.permute(0, 3, 1, 2)  # B,C,H,W
-        x = self.output(x)
+        x = self.final_fixed256(x)
         
         return x
 

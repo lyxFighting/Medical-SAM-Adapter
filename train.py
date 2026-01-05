@@ -131,6 +131,7 @@ def main():
             if edice > best_dice:
                 best_tol = tol
                 is_best = True
+                best_dice = edice
 
                 save_checkpoint({
                 'epoch': epoch + 1,
