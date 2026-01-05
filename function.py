@@ -88,6 +88,7 @@ def train_sam(args, net: nn.Module, optimizer, train_loader,
                 pt = pack['pt']
                 point_labels = pack['p_label']
             name = pack['image_meta_dict']['filename_or_obj']
+            # name = 'bctv.jpg'
 
             if args.thd:
                 imgs, pt, masks = generate_click_prompt(imgs, masks)
@@ -193,8 +194,8 @@ def train_sam(args, net: nn.Module, optimizer, train_loader,
                 
             # Resize to the ordered output size
             pred = F.interpolate(pred,size=(args.out_size,args.out_size), mode="bilinear", align_corners=False)
-            print("pred:", judge_mask_type(pred))
-            print("masks:", judge_mask_type(masks))
+            # print("pred:", judge_mask_type(pred))
+            # print("masks:", judge_mask_type(masks))
             loss = lossfunc(pred, masks)
 
             pbar.set_postfix(**{'loss (batch)': loss.item()})
@@ -257,6 +258,7 @@ def validation_sam(args, val_loader, epoch, net: nn.Module, clean_dir=True):
                 ptw = pack['pt']
                 point_labels = pack['p_label']
             name = pack['image_meta_dict']['filename_or_obj']
+            # name= 'bctv.jpg'
             
             buoy = 0
             if args.evl_chunk:

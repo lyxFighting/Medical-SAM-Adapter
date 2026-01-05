@@ -9,7 +9,7 @@ def parse_args():
     parser.add_argument('-encoder', type=str, default='default', help='encoder type')
     parser.add_argument('-seg_net', type=str, default='transunet', help='net type')
     parser.add_argument('-mod', type=str, default='sam_adpt', help='mod type:seg,cls,val_ad')
-    parser.add_argument('-exp_name', default='msa_test_isic', type=str, help='net type')
+    parser.add_argument('-exp_name', default='REFUGE-MSAdapt', type=str, help='net type')
     parser.add_argument('-type', type=str, default='map', help='condition type:ave,rand,rand_map')
     parser.add_argument('-vis', type=int, default=100, help='visualization')
     parser.add_argument('-reverse', type=bool, default=False, help='adversary reverse')
@@ -29,7 +29,7 @@ def parse_args():
     parser.add_argument('-w', type=int, default=4, help='number of workers for dataloader')
     parser.add_argument('-b', type=int, default=1, help='batch size for dataloader')
     parser.add_argument('-s', type=bool, default=True, help='whether shuffle the dataset')
-    parser.add_argument('-warm', type=int, default=1, help='warm up training phase')
+    parser.add_argument('-warm', type=int, default=2, help='warm up training phase')
     parser.add_argument('-lr', type=float, default=1e-4, help='initial learning rate')
     parser.add_argument('-uinch', type=int, default=1, help='input channel of unet')
     parser.add_argument('-imp_lr', type=float, default=3e-4, help='implicit learning rate')
@@ -37,19 +37,19 @@ def parse_args():
     parser.add_argument('-base_weights', type=str, default = 0, help='the weights baseline')
     parser.add_argument('-sim_weights', type=str, default = 0, help='the weights sim')
     parser.add_argument('-distributed', default='none' ,type=str,help='multi GPU ids to use')#不会用
-    parser.add_argument('-dataset', default='isic' ,type=str,help='dataset name')
+    parser.add_argument('-dataset', default='REFUGE' ,type=str,help='dataset name')
     parser.add_argument('-sam_ckpt', default='/home/liuyuxiu/models/Medical-SAM-Adapter/checkpoints/sam/sam_vit_b_01ec64.pth' , help='sam checkpoint address')
     parser.add_argument('-thd', type=bool, default=False , help='3d or not')
-    parser.add_argument('-chunk', type=int, default=None , help='crop volume depth')
-    parser.add_argument('-num_sample', type=int, default=4 , help='sample pos and neg')
+    parser.add_argument('-chunk', type=int, default=2, help='crop volume depth')
+    parser.add_argument('-num_sample', type=int, default=1 , help='sample pos and neg')
     parser.add_argument('-roi_size', type=int, default=96 , help='resolution of roi')
     parser.add_argument('-evl_chunk', type=int, default=None , help='evaluation chunk')
     parser.add_argument('-mid_dim', type=int, default=None , help='middle dim of adapter or the rank of lora matrix')
-    parser.add_argument('-multimask_output', type=int, default=1 , help='the number of masks output for multi-class segmentation, set 2 for REFUGE dataset.')
+    parser.add_argument('-multimask_output', type=int, default=2, help='the number of masks output for multi-class segmentation, set 2 for REFUGE dataset.')
     parser.add_argument(
     '-data_path',
     type=str,
-    default='/home/liuyuxiu/models/Medical-SAM-Adapter/data/ISIC/',
+    default='/home/liuyuxiu/models/Medical-SAM-Adapter/data/REFUGE-Multirater',
     help='The path of segmentation data')
     # '../dataset/RIGA/DiscRegion'
     # '../dataset/ISIC'

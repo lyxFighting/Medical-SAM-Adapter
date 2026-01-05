@@ -99,14 +99,14 @@ def main():
 
     for epoch in range(settings.EPOCH):
 
-        if epoch < 0:
+        if epoch == 0:
             if args.dataset != 'REFUGE':
                 tol, (eiou, edice) = function.validation_sam(args, nice_test_loader, epoch, net, writer)
                 logger.info(f'Total score: {tol}, IOU: {eiou}, DICE: {edice} || @ epoch {epoch}.')
             else:
                 tol, (eiou_cup, eiou_disc, edice_cup, edice_disc) = function.validation_sam(args, nice_test_loader, epoch, net, writer)
                 logger.info(f'Total score: {tol}, IOU_CUP: {eiou_cup}, IOU_DISC: {eiou_disc}, DICE_CUP: {edice_cup}, DICE_DISC: {edice_disc} || @ epoch {epoch}.')
-
+                edice = (edice_cup + edice_disc)/2
         net.train()
         time_start = time.time()
         loss = function.train_sam(args, net, optimizer, nice_train_loader, epoch, writer, vis = args.vis)
@@ -122,7 +122,7 @@ def main():
             else:
                 tol, (eiou_cup, eiou_disc, edice_cup, edice_disc) = function.validation_sam(args, nice_test_loader, epoch, net, writer)
                 logger.info(f'Total score: {tol}, IOU_CUP: {eiou_cup}, IOU_DISC: {eiou_disc}, DICE_CUP: {edice_cup}, DICE_DISC: {edice_disc} || @ epoch {epoch}.')
-
+                edice = (edice_cup + edice_disc)/2
             if args.distributed != 'none':
                 sd = net.module.state_dict()
             else:
@@ -131,6 +131,7 @@ def main():
             if edice > best_dice:
                 best_tol = tol
                 is_best = True
+                best_dice = edice
 
                 save_checkpoint({
                 'epoch': epoch + 1,

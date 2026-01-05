@@ -987,6 +987,7 @@ def vis_image(imgs, pred_masks, gt_masks, save_path, reverse = False, points = N
         pred_masks = pred_masks.clone()
         gt_masks = gt_masks.clone()
     if c == 2: # for REFUGE multi mask output
+        imgs = torchvision.transforms.Resize((h,w))(imgs)
         pred_disc, pred_cup = pred_masks[:,0,:,:].unsqueeze(1).expand(b,3,h,w), pred_masks[:,1,:,:].unsqueeze(1).expand(b,3,h,w)
         gt_disc, gt_cup = gt_masks[:,0,:,:].unsqueeze(1).expand(b,3,h,w), gt_masks[:,1,:,:].unsqueeze(1).expand(b,3,h,w)
         tup = (imgs[:row_num,:,:,:],pred_disc[:row_num,:,:,:], pred_cup[:row_num,:,:,:], gt_disc[:row_num,:,:,:], gt_cup[:row_num,:,:,:])
