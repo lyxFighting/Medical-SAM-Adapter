@@ -9,7 +9,7 @@ def parse_args():
     parser.add_argument('-encoder', type=str, default='default', help='encoder type')
     parser.add_argument('-seg_net', type=str, default='transunet', help='net type')
     parser.add_argument('-mod', type=str, default='sam_adpt', help='mod type:seg,cls,val_ad')
-    parser.add_argument('-exp_name', default='REFUGE-MSAdapt', type=str, help='net type')
+    parser.add_argument('-exp_name', default='msa_test_isic', type=str, help='net type')
     parser.add_argument('-type', type=str, default='map', help='condition type:ave,rand,rand_map')
     parser.add_argument('-vis', type=int, default=100, help='visualization')
     parser.add_argument('-reverse', type=bool, default=False, help='adversary reverse')
@@ -37,19 +37,19 @@ def parse_args():
     parser.add_argument('-base_weights', type=str, default = 0, help='the weights baseline')
     parser.add_argument('-sim_weights', type=str, default = 0, help='the weights sim')
     parser.add_argument('-distributed', default='none' ,type=str,help='multi GPU ids to use')#不会用
-    parser.add_argument('-dataset', default='REFUGE' ,type=str,help='dataset name')
+    parser.add_argument('-dataset', default='isic' ,type=str,help='dataset name')
     parser.add_argument('-sam_ckpt', default='/home/liuyuxiu/models/Medical-SAM-Adapter/checkpoints/sam/sam_vit_b_01ec64.pth' , help='sam checkpoint address')
     parser.add_argument('-thd', type=bool, default=False , help='3d or not')
-    parser.add_argument('-chunk', type=int, default=2, help='crop volume depth')
-    parser.add_argument('-num_sample', type=int, default=1 , help='sample pos and neg')
-    parser.add_argument('-roi_size', type=int, default=96 , help='resolution of roi')
+    parser.add_argument('-chunk', type=int, default=10, help='crop volume depth')#每个patch的深度D
+    parser.add_argument('-num_sample', type=int, default=1, help='sample pos and neg')#每个 volume 裁剪多少个 patch
+    parser.add_argument('-roi_size', type=int, default=30, help='resolution of roi')#每个 patch 的大小H*W
     parser.add_argument('-evl_chunk', type=int, default=None , help='evaluation chunk')
     parser.add_argument('-mid_dim', type=int, default=None , help='middle dim of adapter or the rank of lora matrix')
-    parser.add_argument('-multimask_output', type=int, default=2, help='the number of masks output for multi-class segmentation, set 2 for REFUGE dataset.')
+    parser.add_argument('-multimask_output', type=int, default=1, help='the number of masks output for multi-class segmentation, set 2 for REFUGE dataset.')
     parser.add_argument(
     '-data_path',
     type=str,
-    default='/home/liuyuxiu/models/Medical-SAM-Adapter/data/REFUGE-Multirater',
+    default='/home/liuyuxiu/models/Medical-SAM-Adapter/data/ISIC',
     help='The path of segmentation data')
     # '../dataset/RIGA/DiscRegion'
     # '../dataset/ISIC'

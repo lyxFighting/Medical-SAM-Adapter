@@ -87,6 +87,10 @@ def train_sam(args, net: nn.Module, optimizer, train_loader,
             else:
                 pt = pack['pt']
                 point_labels = pack['p_label']
+            if 'box' in pack:
+                box = pack['box']
+            else:
+                box = None
             name = pack['image_meta_dict']['filename_or_obj']
             # name = 'bctv.jpg'
 
@@ -117,6 +121,16 @@ def train_sam(args, net: nn.Module, optimizer, train_loader,
                 if(len(point_labels.shape)==1): # only one point prompt
                     coords_torch, labels_torch, showp = coords_torch.unsqueeze(1), labels_torch.unsqueeze(1), showp.unsqueeze(1)
                 pt = (coords_torch, labels_torch)
+            if box is not None:    
+                box = torch.stack(
+                    [
+                        box[0],  # x_min, (B,)
+                        box[2],  # y_min, (B,)
+                        box[1],  # x_max, (B,)
+                        box[3],  # y_max, (B,)
+                    ],
+                    dim=1,  # 关键：拼成 (B, 4)
+                ).float().to(imgs.device)
 
             '''init'''
             if hard:
@@ -152,7 +166,7 @@ def train_sam(args, net: nn.Module, optimizer, train_loader,
                 if args.net == 'sam' or args.net == 'mobile_sam':
                     se, de = net.prompt_encoder(
                         points=pt,#本来是点坐标，但是加上了p_label（前景or背景）
-                        boxes=None,
+                        boxes=box,
                         masks=None,
                     )
                 elif args.net == "efficient_sam":
@@ -361,14 +375,14 @@ def validation_sam(args, val_loader, epoch, net: nn.Module, clean_dir=True):
                     tot += lossfunc(pred, masks) * cur_bsz
 
                     '''vis images'''
-                    if ind % args.vis == 0:#每隔 args.vis 个样本，把当前 batch 的原图 + 预测结果（mask / pred / point）拼成一张图，保存到磁盘
-                        namecat = 'Test'
-                        for na in name[:2
-                        
-                        ]:
-                            img_name = na.split('/')[-1].split('.')[0]
-                            namecat = namecat + img_name + '+'
-                        vis_image(origin_imgs/255,pred, masks, os.path.join(args.path_helper['sample_path'], namecat+'epoch+' +str(epoch) + '.jpg'), reverse=False, points=showp)#把原图、预测 mask、GT mask（可选再加点 prompt / box），按任务类型拼成网格图，保存成一张 jpg/png，用来肉眼检查模型效果。
+                    # if ind % args.vis == 0:#每隔 args.vis 个样本，把当前 batch 的原图 + 预测结果（mask / pred / point）拼成一张图，保存到磁盘
+                    namecat = 'Test'
+                    for na in name[:2
+                    
+                    ]:
+                        img_name = na.split('/')[-1].split('.')[0]
+                        namecat = namecat + img_name + '+'
+                    vis_image(origin_imgs/255,pred, masks, os.path.join(args.path_helper['sample_path'], namecat+'epoch+' +str(epoch) + '.jpg'), reverse=False, points=showp)#把原图、预测 mask、GT mask（可选再加点 prompt / box），按任务类型拼成网格图，保存成一张 jpg/png，用来肉眼检查模型效果。
 
 
                     temp = eval_seg(pred, masks, threshold)

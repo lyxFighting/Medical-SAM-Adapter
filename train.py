@@ -4,7 +4,8 @@
 """ train network using pytorch
     Junde Wu
 """
-
+# import logging
+# logging.disable(logging.WARNING)
 import argparse
 import os
 import sys
@@ -34,6 +35,7 @@ from conf import settings
 #from models.discriminatorlayer import discriminator
 from dataset import *
 from utils import *
+
 
 def main():
 
@@ -99,7 +101,7 @@ def main():
 
     for epoch in range(settings.EPOCH):
 
-        if epoch == 0:
+        if epoch < 5:
             if args.dataset != 'REFUGE':
                 tol, (eiou, edice) = function.validation_sam(args, nice_test_loader, epoch, net, writer)
                 logger.info(f'Total score: {tol}, IOU: {eiou}, DICE: {edice} || @ epoch {epoch}.')

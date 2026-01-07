@@ -1178,17 +1178,17 @@ def calculate_gradient_penalty(netD, real_images, fake_images):
     return grad_penalty
 
 
-def random_click(mask, point_labels = 1):#根据mask随意点击一个前景的点
+def random_click(mask, point_labels = 1,num_points=1):#根据mask随意点击一个前景的点
     # check if all masks are black
     max_label = max(set(mask.flatten()))
     if max_label == 0:
-        point_labels = max_label
+        point_labels = torch.tensor([max_label]*num_points)
+    else:# 非全黑时，标签保持统一（3个点都是传入的label）
+        point_labels = torch.tensor([point_labels]*num_points)
     # max agreement position
     indices = np.argwhere(mask == max_label) 
     indices = indices[:, ::-1].copy()
-    return point_labels, indices[np.random.randint(len(indices))]
-
-
+    return point_labels, indices[np.random.randint(len(indices),size=num_points)]
 def generate_click_prompt(img, msk, pt_label = 1):
     # return: prompt, prompt mask
     pt_list = []
@@ -1226,24 +1226,90 @@ def generate_click_prompt(img, msk, pt_label = 1):
     return img, pt, msk #[b, 2, d], [b, c, h, w, d]
 
 
+# def random_box(multi_rater):
+#     max_value = torch.max(multi_rater[:,0,:,:], dim=0)[0]
+#     max_value_position = torch.nonzero(max_value)
+
+#     y_coords = max_value_position[:, 0]
+#     x_coords = max_value_position[:, 1]
+
+
+#     x_min = int(torch.min(x_coords))
+#     x_max = int(torch.max(x_coords))
+#     y_min = int(torch.min(y_coords))
+#     y_max = int(torch.max(y_coords))
+
+
+#     x_min = random.choice(np.arange(x_min-10,x_min+11))
+#     x_max = random.choice(np.arange(x_max-10,x_max+11))
+#     y_min = random.choice(np.arange(y_min-10,y_min+11))
+#     y_max = random.choice(np.arange(y_max-10,y_max+11))
+
+#     return x_min, x_max, y_min, y_max
+
+#版本一：完全包含真值的框
+# def random_box(multi_rater):
+#     max_value = torch.max(multi_rater[:, 0, :, :], dim=0)[0]
+#     max_value_position = torch.nonzero(max_value)
+
+#     if max_value_position.numel() == 0:
+#         return None
+
+#     y_coords = max_value_position[:, 0]
+#     x_coords = max_value_position[:, 1]
+
+#     x_min = int(torch.min(x_coords))
+#     x_max = int(torch.max(x_coords))
+#     y_min = int(torch.min(y_coords))
+#     y_max = int(torch.max(y_coords))
+
+#     w = x_max - x_min + 1
+#     h = y_max - y_min + 1
+
+#     # ===== 核心：控制 IoU = 0.75 =====
+#     target_iou = 0.75
+#     scale = (1.0 / target_iou) ** 0.5  # sqrt(1 / IoU)
+
+#     dx = int((scale - 1) * w / 2)
+#     dy = int((scale - 1) * h / 2)
+
+#     x_min = x_min - dx
+#     x_max = x_max + dx
+#     y_min = y_min - dy
+#     y_max = y_max + dy
+
+#     return x_min, x_max, y_min, y_max
+#版本二：部分包含真值的框
 def random_box(multi_rater):
-    max_value = torch.max(multi_rater[:,0,:,:], dim=0)[0]
+    max_value = torch.max(multi_rater[:, 0, :, :], dim=0)[0]
     max_value_position = torch.nonzero(max_value)
 
+    if max_value_position.numel() == 0:
+        return None
+
+    # 真值像素坐标
     x_coords = max_value_position[:, 0]
     y_coords = max_value_position[:, 1]
 
-
+    # 最小外接框
     x_min = int(torch.min(x_coords))
     x_max = int(torch.max(x_coords))
     y_min = int(torch.min(y_coords))
     y_max = int(torch.max(y_coords))
 
+    # ===== 核心：按“覆盖 GT 75% 面积”来裁剪 =====
+    target_cover = 0.75
 
-    x_min = random.choice(np.arange(x_min-10,x_min+11))
-    x_max = random.choice(np.arange(x_max-10,x_max+11))
-    y_min = random.choice(np.arange(y_min-10,y_min+11))
-    y_max = random.choice(np.arange(y_max-10,y_max+11))
+    # 当前 GT 高度
+    h = y_max - y_min + 1
+
+    # 只在 y 方向裁剪（保证逻辑清晰、稳定）
+    cut_h = int(h * (1.0 - target_cover))
+
+    # 随机从上或下裁掉
+    if random.random() < 0.5:
+        y_min = y_min + cut_h
+    else:
+        y_max = y_max - cut_h
 
     return x_min, x_max, y_min, y_max
-
