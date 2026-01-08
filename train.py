@@ -36,6 +36,14 @@ from conf import settings
 from dataset import *
 from utils import *
 
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
+font_path = "/home/liuyuxiu/.local/share/fonts/NotoSansCJK-Regular.ttc"
+fm.fontManager.addfont(font_path)
+plt.rcParams['font.sans-serif'] = [fm.FontProperties(fname=font_path).get_name()]
+plt.rcParams['axes.unicode_minus'] = False
+
+
 
 def main():
 
@@ -98,6 +106,8 @@ def main():
     best_acc = 0.0
     best_tol = 1e4
     best_dice = 0.0
+    epoch_list=[]
+    loss_list=[]
 
     for epoch in range(settings.EPOCH):
 
@@ -113,6 +123,8 @@ def main():
         time_start = time.time()
         loss = function.train_sam(args, net, optimizer, nice_train_loader, epoch, writer, vis = args.vis)
         logger.info(f'Train loss: {loss} || @ epoch {epoch}.')
+        epoch_list.append(epoch)
+        loss_list.append(loss)
         time_end = time.time()
         print('time_for_training ', time_end - time_start)
 
@@ -145,7 +157,16 @@ def main():
             }, is_best, args.path_helper['ckpt_path'], filename="best_dice_checkpoint.pth")
             else:
                 is_best = False
-
+    plt.figure(figsize=(12, 6))
+    plt.scatter(epoch_list, loss_list, color='red', label='预测分割和真实分割的loss', alpha=0.7, s=50)
+    plt.plot(epoch_list, loss_list, color='red', linestyle='--', alpha=0.3)
+    plt.xlabel('Epoch', fontsize=12)
+    plt.ylabel('Loss', fontsize=12)
+    plt.title('Training Loss', fontsize=14)
+    plt.legend(fontsize=11)
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(f"{args.path_helper['log_path']}/training_loss.png", dpi=300, bbox_inches='tight')
     writer.close()
 
 
