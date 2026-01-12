@@ -113,11 +113,11 @@ def main():
 
         if epoch < 5:
             if args.dataset != 'REFUGE':
-                tol, (eiou, edice) = function.validation_sam(args, nice_test_loader, epoch, net, writer)
-                logger.info(f'Total score: {tol}, IOU: {eiou}, DICE: {edice} || @ epoch {epoch}.')
+                tol, (eiou, edice,hd95) = function.validation_sam(args, nice_test_loader, epoch, net, writer)
+                logger.info(f'Total score: {tol}, IOU: {eiou}, DICE: {edice}, HD95: {hd95}|| @ epoch {epoch}.')
             else:
-                tol, (eiou_cup, eiou_disc, edice_cup, edice_disc) = function.validation_sam(args, nice_test_loader, epoch, net, writer)
-                logger.info(f'Total score: {tol}, IOU_CUP: {eiou_cup}, IOU_DISC: {eiou_disc}, DICE_CUP: {edice_cup}, DICE_DISC: {edice_disc} || @ epoch {epoch}.')
+                tol, (eiou_disc, eiou_cup, edice_disc, edice_cup, hd95_d, hd95_c) = function.validation_sam(args, nice_test_loader, epoch, net, writer)
+                logger.info(f'Total score: {tol}, IOU_CUP: {eiou_cup}, IOU_DISC: {eiou_disc}, DICE_CUP: {edice_cup}, DICE_DISC: {edice_disc}, HD95_c: {hd95_c}, HD95_d: {hd95_d}|| @ epoch {epoch}.')
                 edice = (edice_cup + edice_disc)/2
         net.train()
         time_start = time.time()
@@ -131,11 +131,11 @@ def main():
         net.eval()
         if epoch and epoch % args.val_freq == 0 or epoch == settings.EPOCH-1:
             if args.dataset != 'REFUGE':
-                tol, (eiou, edice) = function.validation_sam(args, nice_test_loader, epoch, net, writer)
-                logger.info(f'Total score: {tol}, IOU: {eiou}, DICE: {edice} || @ epoch {epoch}.')
+                tol, (eiou, edice,hd95) = function.validation_sam(args, nice_test_loader, epoch, net, writer)
+                logger.info(f'Total score: {tol}, IOU: {eiou}, DICE: {edice}, HD95: {hd95}|| @ epoch {epoch}.')
             else:
-                tol, (eiou_cup, eiou_disc, edice_cup, edice_disc) = function.validation_sam(args, nice_test_loader, epoch, net, writer)
-                logger.info(f'Total score: {tol}, IOU_CUP: {eiou_cup}, IOU_DISC: {eiou_disc}, DICE_CUP: {edice_cup}, DICE_DISC: {edice_disc} || @ epoch {epoch}.')
+                tol, (eiou_disc, eiou_cup, edice_disc, edice_cup, hd95_d, hd95_c) = function.validation_sam(args, nice_test_loader, epoch, net, writer)
+                logger.info(f'Total score: {tol}, IOU_CUP: {eiou_cup}, IOU_DISC: {eiou_disc}, DICE_CUP: {edice_cup}, DICE_DISC: {edice_disc}, HD95_c: {hd95_c}, HD95_d: {hd95_d} || @ epoch {epoch}.')
                 edice = (edice_cup + edice_disc)/2
             if args.distributed != 'none':
                 sd = net.module.state_dict()

@@ -246,6 +246,7 @@ def validation_sam(args, val_loader, epoch, net: nn.Module, clean_dir=True):
     n_val = len(val_loader)  # the number of batch
     dataset_size = len(val_loader.dataset)
     ave_res, mix_res = (0,0,0,0), (0,)*args.multimask_output*2
+    hd95_sums = None
     rater_res = [(0,0,0,0) for _ in range(6)]
     tot = 0
     hard = 0
@@ -385,16 +386,33 @@ def validation_sam(args, val_loader, epoch, net: nn.Module, clean_dir=True):
                     vis_image(origin_imgs/255,pred, masks, os.path.join(args.path_helper['sample_path'], namecat+'epoch+' +str(epoch) + '.jpg'), reverse=False, points=showp)#把原图、预测 mask、GT mask（可选再加点 prompt / box），按任务类型拼成网格图，保存成一张 jpg/png，用来肉眼检查模型效果。
 
 
-                    temp = eval_seg(pred, masks, threshold)
+                    res = eval_seg(pred, masks, threshold)
+
+                    # 第一次进来时，初始化 hd95_sums
+                    if hd95_sums is None:
+                        num_hd95 = len(res) - len(mix_res)
+                        hd95_sums = [0.0] * num_hd95
+
+                    temp = res[:len(mix_res)]
+                    hd95_vals = res[len(mix_res):]
+
                     temp = tuple([number * cur_bsz for number in temp])
                     mix_res = tuple([sum(a) for a in zip(mix_res, temp)])
+                    for i in range(len(hd95_vals)):
+                        hd95_sums[i] += hd95_vals[i]* cur_bsz
 
             pbar.update()
 
     if args.evl_chunk:
         n_val = n_val * (imgsw.size(-1) // evl_ch)
 
-    return tot/dataset_size, tuple([a / dataset_size for a in mix_res])
+    return (
+        tot / dataset_size,
+        tuple([a / dataset_size for a in mix_res]) +
+        tuple(h / dataset_size for h in hd95_sums)
+    )
+
+
 
 def transform_prompt(coord,label,h,w):
     coord = coord.transpose(0,1)

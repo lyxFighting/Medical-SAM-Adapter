@@ -22,6 +22,7 @@ import dateutil.tz
 import matplotlib.pyplot as plt
 import numpy
 import numpy as np
+np.bool = bool
 import PIL
 import seaborn as sns
 import torch
@@ -60,6 +61,8 @@ import cfg
 from models.discriminator import Discriminator
 
 # from siren_pytorch import SirenNet, SirenWrapper
+
+from medpy.metric.binary import hd95
 
 args = cfg.parse_args()
 device = torch.device('cuda', args.gpu_device)
@@ -1047,12 +1050,30 @@ def eval_seg(pred,true_mask_p,threshold):
     b, c, h, w = pred.size()
     pred = F.sigmoid(pred)
     if c == 2:
+        hd95_sum_d = 0
+        hd95_sum_c = 0
+        hd95_cnt_d = 0
+        hd95_cnt_c = 0
         iou_d, iou_c, disc_dice, cup_dice = 0,0,0,0
         for th in threshold:
 
             gt_vmask_p = (true_mask_p > th).float()
             vpred = (pred > th).float()
             vpred_cpu = vpred.cpu()
+
+            if th == 0.5:
+                disc_pred_bin = vpred_cpu[:,0,:,:].numpy().astype(bool)
+                cup_pred_bin = vpred_cpu[:,1,:,:].numpy().astype(bool)
+                disc_mask_bin = gt_vmask_p[:,0,:,:].cpu().numpy().astype(bool)
+                cup_mask_bin = gt_vmask_p[:,1,:,:].cpu().numpy().astype(bool)
+                for i in range(b):
+                    if disc_pred_bin[i].sum() > 0 and disc_mask_bin[i].sum() > 0:
+                        hd95_sum_d += hd95(disc_pred_bin[i], disc_mask_bin[i])
+                        hd95_cnt_d += 1
+                    if cup_pred_bin[i].sum() > 0 and cup_mask_bin[i].sum() > 0:
+                        hd95_sum_c += hd95(cup_pred_bin[i], cup_mask_bin[i])
+                        hd95_cnt_c += 1
+            
             disc_pred = vpred_cpu[:,0,:,:].numpy().astype('int32')
             cup_pred = vpred_cpu[:,1,:,:].numpy().astype('int32')
 
@@ -1067,7 +1088,18 @@ def eval_seg(pred,true_mask_p,threshold):
             disc_dice += dice_coeff(vpred[:,0,:,:], gt_vmask_p[:,0,:,:]).item()
             cup_dice += dice_coeff(vpred[:,1,:,:], gt_vmask_p[:,1,:,:]).item()
             
-        return iou_d / len(threshold), iou_c / len(threshold), disc_dice / len(threshold), cup_dice / len(threshold)
+        mean_hd95_d = hd95_sum_d / max(hd95_cnt_d, 1)
+        mean_hd95_c = hd95_sum_c / max(hd95_cnt_c, 1)
+        return (
+                iou_d / len(threshold),
+                iou_c / len(threshold),
+                disc_dice / len(threshold),
+                cup_dice / len(threshold),
+                mean_hd95_d,
+                mean_hd95_c
+            )
+
+
     elif c > 2: # for multi-class segmentation > 2 classes
         ious = [0] * c
         dices = [0] * c
@@ -1075,6 +1107,7 @@ def eval_seg(pred,true_mask_p,threshold):
             gt_vmask_p = (true_mask_p > th).float()
             vpred = (pred > th).float()
             vpred_cpu = vpred.cpu()
+
             for i in range(0, c):
                 pred = vpred_cpu[:,i,:,:].numpy().astype('int32')
                 mask = gt_vmask_p[:,i,:,:].squeeze(1).cpu().numpy().astype('int32')
@@ -1088,11 +1121,22 @@ def eval_seg(pred,true_mask_p,threshold):
         return tuple(np.array(ious + dices) / len(threshold)) # tuple has a total number of c * 2
     else:
         eiou, edice = 0,0
+        hd95_sum = 0
+        hd95_cnt = 0
         for th in threshold:
 
             gt_vmask_p = (true_mask_p > th).float()
             vpred = (pred > th).float()
             vpred_cpu = vpred.cpu()
+
+            if th == 0.5:
+                pred_bin = vpred_cpu[:,0,:,:].numpy().astype(bool)
+                gt_bin   = gt_vmask_p[:,0,:,:].cpu().numpy().astype(bool)
+                for i in range(b):
+                    if pred_bin[i].sum() > 0 and gt_bin[i].sum() > 0:
+                        hd95_sum += hd95(pred_bin[i], gt_bin[i])
+                        hd95_cnt += 1
+
             disc_pred = vpred_cpu[:,0,:,:].numpy().astype('int32')
 
             disc_mask = gt_vmask_p [:,0,:,:].squeeze(1).cpu().numpy().astype('int32')
@@ -1103,7 +1147,9 @@ def eval_seg(pred,true_mask_p,threshold):
             '''dice for torch'''
             edice += dice_coeff(vpred[:,0,:,:], gt_vmask_p[:,0,:,:]).item()
             
-        return eiou / len(threshold), edice / len(threshold)
+        mean_hd95 = hd95_sum / max(hd95_cnt, 1)
+        return eiou / len(threshold), edice / len(threshold), mean_hd95
+
 
 # @objectives.wrap_objective()
 def dot_compare(layer, batch=1, cossim_pow=0):
