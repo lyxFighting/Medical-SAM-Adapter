@@ -8,7 +8,14 @@ from utils import *
 from .atlas import Atlas
 from .brat import Brat
 from .ddti import DDTI
-from .isic import ISIC2016
+# from .isic import ISIC2016
+use_joint=True
+if use_joint:
+    from .isic_joint import ISIC2016, ISICJointTransform2D
+    print('[INFO] Using ISICJointTransform2D')
+else:
+    from .isic import ISIC2016
+    print('[INFO] Using original ISIC transform pipeline')
 from .kits import KITS
 from .lidc import LIDC
 from .lnq import LNQ
@@ -42,12 +49,36 @@ def get_dataloader(args):
         transforms.Resize((args.out_size,args.out_size)),
         transforms.ToTensor(),
     ])
+
+
     
     if args.dataset == 'isic':
         '''isic data'''
-        isic_train_dataset = ISIC2016(args, args.data_path, transform = transform_train, transform_msk= transform_train_seg, mode = 'Training')
-        isic_test_dataset = ISIC2016(args, args.data_path, transform = transform_test, transform_msk= transform_test_seg, mode = 'Test')
+        if use_joint:
+            joint_tf_train = ISICJointTransform2D(
+                img_size=args.image_size,
+                low_img_size=args.out_size,
+                ori_size=args.out_size,
+                p_flip=0.5,
+            )
 
+            joint_tf_test = ISICJointTransform2D(
+                img_size=args.image_size,
+                low_img_size=args.out_size,
+                ori_size=args.out_size,
+                p_flip=0.0,
+                p_rota=0.0,
+                p_scale=0.0,
+                p_gaussn=0.0,
+                p_contr=0.0,
+                p_gama=0.0,
+                color_jitter_params=None,
+            )
+            isic_train_dataset = ISIC2016(args,args.data_path,joint_transform=joint_tf_train,mode='Training')
+            isic_test_dataset = ISIC2016(args,args.data_path,joint_transform=joint_tf_test,mode='Test')
+        else:
+            isic_train_dataset = ISIC2016(args, args.data_path, transform = transform_train, transform_msk= transform_train_seg, mode = 'Training')
+            isic_test_dataset = ISIC2016(args, args.data_path, transform = transform_test, transform_msk= transform_test_seg, mode = 'Test')
         nice_train_loader = DataLoader(isic_train_dataset, batch_size=args.b, shuffle=True, num_workers=8, pin_memory=True)
         nice_test_loader = DataLoader(isic_test_dataset, batch_size=args.b, shuffle=False, num_workers=8, pin_memory=True)
         '''end'''

@@ -1056,7 +1056,6 @@ def eval_seg(pred,true_mask_p,threshold):
         hd95_cnt_c = 0
         iou_d, iou_c, disc_dice, cup_dice = 0,0,0,0
         for th in threshold:
-
             gt_vmask_p = (true_mask_p > th).float()
             vpred = (pred > th).float()
             vpred_cpu = vpred.cpu()
@@ -1124,7 +1123,6 @@ def eval_seg(pred,true_mask_p,threshold):
         hd95_sum = 0
         hd95_cnt = 0
         for th in threshold:
-
             gt_vmask_p = (true_mask_p > th).float()
             vpred = (pred > th).float()
             vpred_cpu = vpred.cpu()
