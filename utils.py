@@ -380,45 +380,78 @@ def save_image(
     im.save(fp, format=format)
     
 
-def create_logger(log_dir, phase='train'):
+def create_timestamp_dir(root_dir):
+    """
+    只创建一次的 timestamp 目录
+    """
+    os.makedirs(root_dir, exist_ok=True)
+
+    now = datetime.now(dateutil.tz.tzlocal())
+    timestamp = now.strftime('%Y_%m_%d_%H_%M_%S')
+    prefix = os.path.join(root_dir, f'experiment{timestamp}')
+    os.makedirs(prefix, exist_ok=True)
+    
+    return prefix
+
+def create_logger(log_dir, name, phase='train'):
+    """
+    为每个 dataset 创建独立 logger
+    """
+    os.makedirs(log_dir, exist_ok=True)
+
     time_str = time.strftime('%Y-%m-%d-%H-%M')
-    log_file = '{}_{}.log'.format(time_str, phase)
+    log_file = f'{time_str}_{phase}.log'
     final_log_file = os.path.join(log_dir, log_file)
-    head = '%(asctime)-15s %(message)s'
-    logging.basicConfig(filename=str(final_log_file),
-                        format=head)
-    logger = logging.getLogger()
+
+    logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
-    console = logging.StreamHandler()
-    logging.getLogger('').addHandler(console)
+
+    # ⚠️ 防止重复添加 handler（非常重要）
+    if logger.handlers:
+        return logger
+
+    formatter = logging.Formatter('%(asctime)-15s %(message)s')
+
+    # file handler
+    fh = logging.FileHandler(final_log_file)
+    fh.setLevel(logging.INFO)
+    fh.setFormatter(formatter)
+
+    # console handler
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    ch.setFormatter(formatter)
+
+    logger.addHandler(fh)
+    logger.addHandler(ch)
+
+    # 防止向 root 传播
+    logger.propagate = False
 
     return logger
 
 
-def set_log_dir(root_dir, exp_name):
+def set_log_dir(shared_prefix, exp_name):
     path_dict = {}
-    os.makedirs(root_dir, exist_ok=True)
 
-    # set log path
-    exp_path = os.path.join(root_dir, exp_name)
-    now = datetime.now(dateutil.tz.tzlocal())
-    timestamp = now.strftime('%Y_%m_%d_%H_%M_%S')
-    prefix = exp_path + '_' + timestamp
-    os.makedirs(prefix)
-    path_dict['prefix'] = prefix
+    # 每个 dataset 一个子目录
+    exp_dir = os.path.join(shared_prefix, exp_name)
+    os.makedirs(exp_dir, exist_ok=True)
+    path_dict['prefix'] = exp_dir
 
-    # set checkpoint path
-    ckpt_path = os.path.join(prefix, 'Model')
-    os.makedirs(ckpt_path)
+    # checkpoint
+    ckpt_path = os.path.join(exp_dir, 'Model')
+    os.makedirs(ckpt_path, exist_ok=True)
     path_dict['ckpt_path'] = ckpt_path
 
-    log_path = os.path.join(prefix, 'Log')
-    os.makedirs(log_path)
+    # log
+    log_path = os.path.join(exp_dir, 'Log')
+    os.makedirs(log_path, exist_ok=True)
     path_dict['log_path'] = log_path
 
-    # set sample image path for fid calculation
-    sample_path = os.path.join(prefix, 'Samples')
-    os.makedirs(sample_path)
+    # samples
+    sample_path = os.path.join(exp_dir, 'Samples')
+    os.makedirs(sample_path, exist_ok=True)
     path_dict['sample_path'] = sample_path
 
     return path_dict

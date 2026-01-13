@@ -1,15 +1,11 @@
-import math
 from typing import Optional, Tuple, Type
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from einops import rearrange
-
-from ...common import Adapter, LayerNorm2d
 
 
-class AdapterBlock(nn.Module):
+class lyxBlock(nn.Module):
     """Transformer blocks with support of window attention and residual propagation blocks"""
 
     def __init__(
@@ -18,7 +14,6 @@ class AdapterBlock(nn.Module):
         dim: int,
         num_heads: int,
         mlp_ratio: float = 4.0,
-        scale: float = 0.5,
         qkv_bias: bool = True,
         norm_layer: Type[nn.Module] = nn.LayerNorm,
         act_layer: Type[nn.Module] = nn.GELU,
@@ -43,7 +38,6 @@ class AdapterBlock(nn.Module):
                 positional parameter size.
         """
         super().__init__()
-        self.args = args
         self.norm1 = norm_layer(dim)
         self.attn = Attention(
             dim,
@@ -54,14 +48,6 @@ class AdapterBlock(nn.Module):
             input_size=input_size if window_size == 0 else (window_size, window_size),
         )
 
-        if(args.mid_dim != None):
-            adapter_dim = args.mid_dim
-        else:
-            adapter_dim = dim
-
-        self.MLP_Adapter = Adapter(adapter_dim, skip_connect=False)  # MLP-adapter, no skip connection
-        self.Space_Adapter = Adapter(adapter_dim)  # with skip connection
-        self.scale = scale
         self.norm2 = norm_layer(dim)
         self.mlp = MLPBlock(embedding_dim=dim, mlp_dim=int(dim * mlp_ratio), act=act_layer)
 
@@ -69,23 +55,36 @@ class AdapterBlock(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         shortcut = x
+        x = self.norm1(x)
         # Window partition
         if self.window_size > 0:
             H, W = x.shape[1], x.shape[2]
-            x, pad_hw = window_partition(x, self.window_size)#pad_hw为填充后的高度和宽度以便能被self.window_size整除，没有整除关系就无法均匀分窗口
+            x, pad_hw = window_partition(x, self.window_size)
 
-        x = self.norm1(x)
         x = self.attn(x)
-        x = self.Space_Adapter(x)
-
         # Reverse window partition
         if self.window_size > 0:
             x = window_unpartition(x, self.window_size, pad_hw, (H, W))
 
         x = shortcut + x
-        xn = self.norm2(x)
-        x = x + self.mlp(xn) + self.scale * self.MLP_Adapter(xn)
+        x = x + self.mlp(self.norm2(x))
+
         return x
+
+class MLPBlock(nn.Module):
+    def __init__(
+        self,
+        embedding_dim: int,
+        mlp_dim: int,
+        act: Type[nn.Module] = nn.GELU,
+    ) -> None:
+        super().__init__()
+        self.lin1 = nn.Linear(embedding_dim, mlp_dim)
+        self.lin2 = nn.Linear(mlp_dim, embedding_dim)
+        self.act = act()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.lin2(self.act(self.lin1(x)))
 
 
 class Attention(nn.Module):
@@ -127,22 +126,21 @@ class Attention(nn.Module):
             self.rel_h = nn.Parameter(torch.zeros(2 * input_size[0] - 1, head_dim))
             self.rel_w = nn.Parameter(torch.zeros(2 * input_size[1] - 1, head_dim))
 
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, H, W, _ = x.shape
         # qkv with shape (3, B, nHead, H * W, C)
-        qkv = self.qkv(x).reshape(B, H * W, 3, self.num_heads, -1).permute(2, 0, 3, 1, 4)#(3,25,12,196,64) [3, B, num_heads, H*W, head_dim]
+        qkv = self.qkv(x).reshape(B, H * W, 3, self.num_heads, -1).permute(2, 0, 3, 1, 4)
         # q, k, v with shape (B * nHead, H * W, C)
-        q, k, v = qkv.reshape(3, B * self.num_heads, H * W, -1).unbind(0)#(3,num_heads, H*W, head_dim）→3个(num_heads, H*W, head_dim）（300，196，64）
+        q, k, v = qkv.reshape(3, B * self.num_heads, H * W, -1).unbind(0)
 
-        attn = (q * self.scale) @ k.transpose(-2, -1)#self.scale=1/sqrt(64) ≈ 0.125，attn.shape=(300,196,196)
+        attn = (q * self.scale) @ k.transpose(-2, -1)
 
         if self.use_rel_pos:
-            attn = add_decomposed_rel_pos(attn, q, self.rel_h, self.rel_w, (H, W), (H, W))#实现分解的相对位置编码：将2D位置编码分解为高度和宽度两个1D编码
+            attn = add_decomposed_rel_pos(attn, q, self.rel_h, self.rel_w, (H, W), (H, W))
 
         attn = attn.softmax(dim=-1)
         x = (attn @ v).view(B, self.num_heads, H, W, -1).permute(0, 2, 3, 1, 4).reshape(B, H, W, -1)
-        x = self.proj(x)#整合多头信息
+        x = self.proj(x)
 
         return x
 
@@ -195,6 +193,7 @@ def window_unpartition(
         x = x[:, :H, :W, :].contiguous()
     return x
 
+
 def get_rel_pos(q_size: int, k_size: int, rel_pos: torch.Tensor) -> torch.Tensor:
     """
     Get relative positional embeddings according to the relative positions of
@@ -226,6 +225,7 @@ def get_rel_pos(q_size: int, k_size: int, rel_pos: torch.Tensor) -> torch.Tensor
     relative_coords = (q_coords - k_coords) + (k_size - 1) * max(q_size / k_size, 1.0)
 
     return rel_pos_resized[relative_coords.long()]
+
 
 def add_decomposed_rel_pos(
     attn: torch.Tensor,
@@ -264,30 +264,3 @@ def add_decomposed_rel_pos(
     ).view(B, q_h * q_w, k_h * k_w)
 
     return attn
-
-def closest_numbers(target):
-    a = int(target ** 0.5)
-    b = a + 1
-    while True:
-        if a * b == target:
-            return (a, b)
-        elif a * b < target:
-            b += 1
-        else:
-            a -= 1
-
-
-class MLPBlock(nn.Module):
-    def __init__(
-        self,
-        embedding_dim: int,
-        mlp_dim: int,
-        act: Type[nn.Module] = nn.GELU,
-    ) -> None:
-        super().__init__()
-        self.lin1 = nn.Linear(embedding_dim, mlp_dim)
-        self.lin2 = nn.Linear(mlp_dim, embedding_dim)
-        self.act = act()
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.lin2(self.act(self.lin1(x)))

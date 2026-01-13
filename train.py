@@ -1,11 +1,3 @@
-# train.py
-#!/usr/bin/env	python3
-
-""" train network using pytorch
-    Junde Wu
-"""
-# import logging
-# logging.disable(logging.WARNING)
 import argparse
 import os
 import sys
@@ -32,7 +24,6 @@ from tqdm import tqdm
 import cfg
 import function
 from conf import settings
-#from models.discriminatorlayer import discriminator
 from dataset import *
 from utils import *
 
@@ -46,128 +37,102 @@ plt.rcParams['axes.unicode_minus'] = False
 
 
 def main():
-
     args = cfg.parse_args()
-
     seed = args.seed
     set_seed(seed)
 
+    data_path='/home/liuyuxiu/models/Medical-SAM-Adapter/data'
     GPUdevice = torch.device('cuda', args.gpu_device)
+    # data_list = [f for f in os.listdir(data_path) if os.path.isdir(os.path.join(data_path, f))]
+    data_list = sorted([f for f in os.listdir(data_path) if os.path.isdir(os.path.join(data_path, f))],
+                       key=lambda x: len([f for f in os.listdir(os.path.join(data_path, x, 'images')) 
+                                          if os.path.isfile(os.path.join(data_path, x, 'images', f))]) 
+                       if os.path.exists(os.path.join(data_path, x, 'images')) else 0)
+    shared_prefix = create_timestamp_dir('/home/liuyuxiu/models/Medical-SAM-Adapter/logs_alldata')
+    data_list=['Fascicle-FALLMUDRyan']
+    for dataset_name in data_list:
+        args.dataset = dataset_name
+        args.data_path = os.path.join(data_path, dataset_name)
+        args.path_helper = set_log_dir(shared_prefix, dataset_name)
+        logger = create_logger(args.path_helper['log_path'],name=dataset_name)
+        logger.info(args)
+        print(f'================== Start training on {dataset_name} ==================')
 
-    net = get_network(args, args.net, use_gpu=args.gpu, gpu_device=GPUdevice, distribution = args.distributed)
-    if args.pretrain:
-        weights = torch.load(args.pretrain)
-        net.load_state_dict(weights,strict=False)
+        net = get_network(args, args.net, use_gpu=args.gpu, gpu_device=GPUdevice, distribution = args.distributed)
+        if args.pretrain:
+            weights = torch.load(args.pretrain)
+            net.load_state_dict(weights,strict=False)
 
-    optimizer = optim.Adam(net.parameters(), lr=args.lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5) #learning rate decay
+        optimizer = optim.Adam(net.parameters(), lr=args.lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)
+        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5) #learning rate decay
 
-    '''load pretrained model'''
-    if args.weights != 0:
-        print(f'=> resuming from {args.weights}')
-        assert os.path.exists(args.weights)
-        checkpoint_file = os.path.join(args.weights)
-        assert os.path.exists(checkpoint_file)
-        loc = 'cuda:{}'.format(args.gpu_device)
-        checkpoint = torch.load(checkpoint_file, map_location=loc)
-        start_epoch = checkpoint['epoch']
-        best_tol = checkpoint['best_tol']
+        nice_train_loader, nice_test_loader = get_dataloader(args)
 
-        net.load_state_dict(checkpoint['state_dict'],strict=False)
-        # optimizer.load_state_dict(checkpoint['optimizer'], strict=False)
+        '''checkpoint path and tensorboard'''
+        # iter_per_epoch = len(Glaucoma_training_loader)
+        checkpoint_path = os.path.join(settings.CHECKPOINT_PATH, args.net, settings.TIME_NOW)
+        #use tensorboard
+        if not os.path.exists(settings.LOG_DIR):
+            os.mkdir(settings.LOG_DIR)
+        writer = SummaryWriter(log_dir=os.path.join(
+                settings.LOG_DIR, args.net, settings.TIME_NOW))
 
-        args.path_helper = checkpoint['path_helper']
-        logger = create_logger(args.path_helper['log_path'])
-        print(f'=> loaded checkpoint {checkpoint_file} (epoch {start_epoch})')
+        '''begain training'''
+        best_acc = 0.0
+        best_tol = 1e4
+        best_dice = 0.0
+        epoch_list=[]
+        loss_list=[]
 
-    args.path_helper = set_log_dir('/home/liuyuxiu/models/Medical-SAM-Adapter/logs', args.exp_name)
-    logger = create_logger(args.path_helper['log_path'])
-    logger.info(args)
-
-    nice_train_loader, nice_test_loader = get_dataloader(args)
-
-    '''checkpoint path and tensorboard'''
-    # iter_per_epoch = len(Glaucoma_training_loader)
-    checkpoint_path = os.path.join(settings.CHECKPOINT_PATH, args.net, settings.TIME_NOW)
-    #use tensorboard
-    if not os.path.exists(settings.LOG_DIR):
-        os.mkdir(settings.LOG_DIR)
-    writer = SummaryWriter(log_dir=os.path.join(
-            settings.LOG_DIR, args.net, settings.TIME_NOW))
-    # input_tensor = torch.Tensor(args.b, 3, 256, 256).cuda(device = GPUdevice)
-    # writer.add_graph(net, Variable(input_tensor, requires_grad=True))
-
-    #create checkpoint folder to save model
-    # if not os.path.exists(checkpoint_path):
-    #     os.makedirs(checkpoint_path)
-    # checkpoint_path = os.path.join(checkpoint_path, '{net}-{epoch}-{type}.pth')
-
-    '''begain training'''
-    best_acc = 0.0
-    best_tol = 1e4
-    best_dice = 0.0
-    epoch_list=[]
-    loss_list=[]
-
-    for epoch in range(settings.EPOCH):
-
-        if epoch < 5:
-            if args.dataset != 'REFUGE':
+        for epoch in range(settings.EPOCH):
+            if epoch < 0:
                 tol, (eiou, edice,hd95) = function.validation_sam(args, nice_test_loader, epoch, net, writer)
                 logger.info(f'Total score: {tol}, IOU: {eiou}, DICE: {edice}, HD95: {hd95}|| @ epoch {epoch}.')
-            else:
-                tol, (eiou_disc, eiou_cup, edice_disc, edice_cup, hd95_d, hd95_c) = function.validation_sam(args, nice_test_loader, epoch, net, writer)
-                logger.info(f'Total score: {tol}, IOU_CUP: {eiou_cup}, IOU_DISC: {eiou_disc}, DICE_CUP: {edice_cup}, DICE_DISC: {edice_disc}, HD95_c: {hd95_c}, HD95_d: {hd95_d}|| @ epoch {epoch}.')
-                edice = (edice_cup + edice_disc)/2
-        net.train()
-        time_start = time.time()
-        loss = function.train_sam(args, net, optimizer, nice_train_loader, epoch, writer, vis = args.vis)
-        logger.info(f'Train loss: {loss} || @ epoch {epoch}.')
-        epoch_list.append(epoch)
-        loss_list.append(loss)
-        time_end = time.time()
-        print('time_for_training ', time_end - time_start)
 
-        net.eval()
-        if epoch and epoch % args.val_freq == 0 or epoch == settings.EPOCH-1:
-            if args.dataset != 'REFUGE':
+            net.train()
+            time_start = time.time()
+            loss = function.train_sam(args, net, optimizer, nice_train_loader, epoch,vis = args.vis)
+            logger.info(f'Train loss: {loss} || @ epoch {epoch}.')
+            epoch_list.append(epoch)
+            loss_list.append(loss)
+            time_end = time.time()
+            print('time_for_training ', time_end - time_start)
+
+            net.eval()
+            if epoch and epoch % args.val_freq == 0 or epoch == settings.EPOCH-1:
                 tol, (eiou, edice,hd95) = function.validation_sam(args, nice_test_loader, epoch, net, writer)
                 logger.info(f'Total score: {tol}, IOU: {eiou}, DICE: {edice}, HD95: {hd95}|| @ epoch {epoch}.')
-            else:
-                tol, (eiou_disc, eiou_cup, edice_disc, edice_cup, hd95_d, hd95_c) = function.validation_sam(args, nice_test_loader, epoch, net, writer)
-                logger.info(f'Total score: {tol}, IOU_CUP: {eiou_cup}, IOU_DISC: {eiou_disc}, DICE_CUP: {edice_cup}, DICE_DISC: {edice_disc}, HD95_c: {hd95_c}, HD95_d: {hd95_d} || @ epoch {epoch}.')
-                edice = (edice_cup + edice_disc)/2
-            if args.distributed != 'none':
-                sd = net.module.state_dict()
-            else:
-                sd = net.state_dict()
+                if args.distributed != 'none':
+                    sd = net.module.state_dict()
+                else:
+                    sd = net.state_dict()
 
-            if edice > best_dice:
-                best_tol = tol
-                is_best = True
-                best_dice = edice
+                if edice > best_dice:
+                    best_tol = tol
+                    is_best = True
+                    best_dice = edice
 
-                save_checkpoint({
-                'epoch': epoch + 1,
-                'model': args.net,
-                'state_dict': sd,
-                'optimizer': optimizer.state_dict(),
-                'best_tol': best_dice,
-                'path_helper': args.path_helper,
-            }, is_best, args.path_helper['ckpt_path'], filename="best_dice_checkpoint.pth")
-            else:
-                is_best = False
-    plt.figure(figsize=(12, 6))
-    plt.scatter(epoch_list, loss_list, color='red', label='预测分割和真实分割的loss', alpha=0.7, s=50)
-    plt.plot(epoch_list, loss_list, color='red', linestyle='--', alpha=0.3)
-    plt.xlabel('Epoch', fontsize=12)
-    plt.ylabel('Loss', fontsize=12)
-    plt.title('Training Loss', fontsize=14)
-    plt.legend(fontsize=11)
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(f"{args.path_helper['log_path']}/training_loss.png", dpi=300, bbox_inches='tight')
-    writer.close()
+                    save_checkpoint({
+                    'epoch': epoch + 1,
+                    'model': args.net,
+                    'state_dict': sd,
+                    'optimizer': optimizer.state_dict(),
+                    'best_tol': best_dice,
+                    'path_helper': args.path_helper,
+                }, is_best, args.path_helper['ckpt_path'], filename="best_dice_checkpoint.pth")
+                else:
+                    is_best = False
+        plt.figure(figsize=(12, 6))
+        plt.scatter(epoch_list, loss_list, color='red', label='预测分割和真实分割的loss', alpha=0.7, s=50)
+        plt.plot(epoch_list, loss_list, color='red', linestyle='--', alpha=0.3)
+        plt.xlabel('Epoch', fontsize=12)
+        plt.ylabel('Loss', fontsize=12)
+        plt.title('Training Loss', fontsize=14)
+        plt.legend(fontsize=11)
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(f"{args.path_helper['log_path']}/training_loss.png", dpi=300, bbox_inches='tight')
+        writer.close()
 
 
 if __name__ == '__main__':

@@ -5,7 +5,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 from utils import random_box, random_click
 
-class ISIC2016(Dataset):
+class dataset(Dataset):
     def __init__(self, args, data_path, img_ids, transform=None, transform_msk=None, prompt='click', img_ext='.jpg', mask_ext='.png'):
         """
         args: 包含 image_size
@@ -44,23 +44,17 @@ class ISIC2016(Dataset):
         newsize = (self.img_size, self.img_size)
         mask = mask.resize(newsize)
 
-        # click prompt
-        if self.prompt == 'click':
-            point_label, pt = random_click(np.array(mask) / 255, point_label)
-        else:
-            pt = np.array([])  # 没有点提示时置空
-
-        # 图像增强保持随机性一致
-        if self.transform:
-            state = torch.get_rng_state()
-            img = self.transform(img)
-            torch.set_rng_state(state)
-
-            if self.transform_msk:
-                mask = self.transform_msk(mask).int()
+        point_label, pt = random_click(np.array(mask) / 255, point_label)
+        state = torch.get_rng_state()
+        img = self.transform(img)
+        torch.set_rng_state(state)
+        mask = self.transform_msk(mask).long()
 
         image_meta_dict = {'filename_or_obj': img_id}
 
+        img = img.float()
+        pt = torch.as_tensor(pt, dtype=torch.float32)
+        point_label = torch.as_tensor(point_label, dtype=torch.long)
         return {
             'image': img,
             'label': mask,

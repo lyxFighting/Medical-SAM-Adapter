@@ -58,9 +58,7 @@ global_step_best = 0
 epoch_loss_values = []
 metric_values = []
 
-def train_sam(args, net: nn.Module, optimizer, train_loader,
-          epoch, writer, schedulers=None, vis = 50):
-    hard = 0
+def train_sam(args, net: nn.Module, optimizer, train_loader,epoch, vis = 50):
     epoch_loss = 0
     ind = 0
     # train mode
@@ -70,51 +68,26 @@ def train_sam(args, net: nn.Module, optimizer, train_loader,
     epoch_loss = 0
     GPUdevice = torch.device('cuda:' + str(args.gpu_device))
 
-    if args.thd:
-        lossfunc = DiceCELoss(sigmoid=True, squared_pred=True, reduction='mean')
-    else:
-        lossfunc = criterion_G
+    lossfunc = criterion_G
 
     with tqdm(total=len(train_loader), desc=f'Epoch {epoch}', unit='img') as pbar:
         for pack in train_loader:
             # torch.cuda.empty_cache()
             imgs = pack['image'].to(dtype = torch.float32, device = GPUdevice)
             masks = pack['label'].to(dtype = torch.float32, device = GPUdevice)
-            # for k,v in pack['image_meta_dict'].items():
-            #     print(k)
-            if 'pt' not in pack:
-                imgs, pt, masks = generate_click_prompt(imgs, masks)
-            else:
-                pt = pack['pt']
-                point_labels = pack['p_label']
+            pt = pack['pt']
+            point_labels = pack['p_label']
             if 'box' in pack:
                 box = pack['box']
             else:
                 box = None
             name = pack['image_meta_dict']['filename_or_obj']
-            # name = 'bctv.jpg'
 
-            if args.thd:
-                imgs, pt, masks = generate_click_prompt(imgs, masks)
-
-                pt = rearrange(pt, 'b n d -> (b d) n')
-                imgs = rearrange(imgs, 'b c h w d -> (b d) c h w ')
-                masks = rearrange(masks, 'b c h w d -> (b d) c h w ')
-
-                imgs = imgs.repeat(1,3,1,1)
-                point_labels = torch.ones(imgs.size(0))
-
-                imgs = torchvision.transforms.Resize((args.image_size,args.image_size))(imgs)
-                masks = torchvision.transforms.Resize((args.out_size,args.out_size))(masks)
             showp = pt[..., [1, 0]]
-
-            mask_type = torch.float32
             ind += 1
             b_size,c,w,h = imgs.size()
-            longsize = w if w >=h else h
 
             if point_labels.clone().flatten()[0] != -1:
-                    # point_coords = samtrans.ResizeLongestSide(longsize).apply_coords(pt, (h, w))
                 point_coords = pt
                 coords_torch = torch.as_tensor(point_coords, dtype=torch.float, device=GPUdevice)
                 labels_torch = torch.as_tensor(point_labels, dtype=torch.int, device=GPUdevice)
@@ -131,12 +104,6 @@ def train_sam(args, net: nn.Module, optimizer, train_loader,
                     ],
                     dim=1,  # 关键：拼成 (B, 4)
                 ).float().to(imgs.device)
-
-            '''init'''
-            if hard:
-                true_mask_ave = (true_mask_ave > 0.5).float()
-                #true_mask_ave = cons_tensor(true_mask_ave)
-            # imgs = imgs.to(dtype = mask_type,device = GPUdevice)
 
             '''Train'''
             if args.mod == 'sam_adpt':
@@ -247,9 +214,7 @@ def validation_sam(args, val_loader, epoch, net: nn.Module, clean_dir=True):
     dataset_size = len(val_loader.dataset)
     ave_res, mix_res = (0,0,0,0), (0,)*args.multimask_output*2
     hd95_sums = None
-    rater_res = [(0,0,0,0) for _ in range(6)]
     tot = 0
-    hard = 0
     threshold = (0.1, 0.3, 0.5, 0.7, 0.9)
     GPUdevice = torch.device('cuda:' + str(args.gpu_device))
     device = GPUdevice
@@ -265,15 +230,12 @@ def validation_sam(args, val_loader, epoch, net: nn.Module, clean_dir=True):
             masksw = pack['label'].to(dtype = torch.float32, device = GPUdevice)
 
             cur_bsz = imgsw.shape[0]
-            # for k,v in pack['image_meta_dict'].items():
-            #     print(k)
             if 'pt' not in pack or args.thd:
                 imgsw, ptw, masksw = generate_click_prompt(imgsw, masksw)
             else:
                 ptw = pack['pt']
                 point_labels = pack['p_label']
             name = pack['image_meta_dict']['filename_or_obj']
-            # name= 'bctv.jpg'
             
             buoy = 0
             if args.evl_chunk:
@@ -309,7 +271,6 @@ def validation_sam(args, val_loader, epoch, net: nn.Module, clean_dir=True):
                 longsize = w if w >=h else h
 
                 if point_labels.clone().flatten()[0] != -1:
-                    # point_coords = samtrans.ResizeLongestSide(longsize).apply_coords(pt, (h, w))
                     point_coords = pt
                     coords_torch = torch.as_tensor(point_coords, dtype=torch.float, device=GPUdevice)
                     labels_torch = torch.as_tensor(point_labels, dtype=torch.int, device=GPUdevice)
@@ -317,10 +278,6 @@ def validation_sam(args, val_loader, epoch, net: nn.Module, clean_dir=True):
                         coords_torch, labels_torch, showp = coords_torch.unsqueeze(1), labels_torch.unsqueeze(1), showp.unsqueeze(1)
                     pt = (coords_torch, labels_torch)
 
-                '''init'''
-                if hard:
-                    true_mask_ave = (true_mask_ave > 0.5).float()
-                    #true_mask_ave = cons_tensor(true_mask_ave)
                 imgs = imgs.to(dtype = mask_type,device = GPUdevice)
                 
                 '''test'''
