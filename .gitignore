@@ -6,3 +6,4 @@ pipline.sh
 *.pyc
 __pycache__/
 /databeifen
+/logs_alldata
