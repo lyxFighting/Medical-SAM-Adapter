@@ -83,7 +83,7 @@ class ISICJointTransform2D:
         p_gaussn=0.0,
         p_contr=0.0,
         p_gama=0.0,
-        color_jitter_params=(0.1, 0.1, 0.1, 0.1),
+        color_jitter_params=None,
         p_random_affine=0.0,
     ):
         self.img_size = img_size

@@ -1,21 +1,29 @@
+from logging import config
 import numpy as np
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader, random_split
 from torch.utils.data.sampler import SubsetRandomSampler
+from sklearn.model_selection import train_test_split
+from glob import glob
 
 from utils import *
+
 
 from .atlas import Atlas
 from .brat import Brat
 from .ddti import DDTI
 # from .isic import ISIC2016
-use_joint=True
-if use_joint:
+isicdataset=1
+if isicdataset==0:
+    from .isic import ISIC2016
+    print('[INFO] Using original ISIC transform pipeline')
+elif isicdataset==1:
     from .isic_joint import ISIC2016, ISICJointTransform2D
     print('[INFO] Using ISICJointTransform2D')
 else:
-    from .isic import ISIC2016
-    print('[INFO] Using original ISIC transform pipeline')
+    from .isic_idgeneral import ISIC2016
+    print('[INFO] Using ISIC2016 with click prompt')
+
 from .kits import KITS
 from .lidc import LIDC
 from .lnq import LNQ
@@ -54,31 +62,40 @@ def get_dataloader(args):
     
     if args.dataset == 'isic':
         '''isic data'''
-        if use_joint:
+        if isicdataset==0:
+            isic_train_dataset = ISIC2016(args, args.data_path, transform = transform_train, transform_msk= transform_train_seg, mode = 'Training')
+            isic_test_dataset = ISIC2016(args, args.data_path, transform = transform_test, transform_msk= transform_test_seg, mode = 'Test')
+        elif isicdataset==1:
             joint_tf_train = ISICJointTransform2D(
                 img_size=args.image_size,
                 low_img_size=args.out_size,
                 ori_size=args.image_size,
                 p_flip=0.5,
+                p_rota=0.5,
+                p_scale=0.5,
+                p_gaussn=0.5,
+                p_contr=0.5,
+                p_gama=0.5,
+                color_jitter_params=(0.1, 0.1, 0.1, 0.1),
             )
 
             joint_tf_test = ISICJointTransform2D(
                 img_size=args.image_size,
                 low_img_size=args.out_size,
                 ori_size=args.image_size,
-                p_flip=0.0,
-                p_rota=0.0,
-                p_scale=0.0,
-                p_gaussn=0.0,
-                p_contr=0.0,
-                p_gama=0.0,
-                color_jitter_params=None,
             )
             isic_train_dataset = ISIC2016(args,args.data_path,joint_transform=joint_tf_train,mode='Training')
             isic_test_dataset = ISIC2016(args,args.data_path,joint_transform=joint_tf_test,mode='Test')
         else:
-            isic_train_dataset = ISIC2016(args, args.data_path, transform = transform_train, transform_msk= transform_train_seg, mode = 'Training')
-            isic_test_dataset = ISIC2016(args, args.data_path, transform = transform_test, transform_msk= transform_test_seg, mode = 'Test')
+            img_ext = '.jpg'
+            mask_ext = '_Segmentation.png'
+            args.data_path = '/home/liuyuxiu/models/Medical-SAM-Adapter/data/ISIC/isic_all'
+            img_ids = sorted(glob(os.path.join(args.data_path,'images', '*' + img_ext)))
+            img_ids = [os.path.splitext(os.path.basename(p))[0] for p in img_ids]
+            train_img_ids, val_img_ids = train_test_split(img_ids, test_size=0.3, random_state=2981)
+            isic_train_dataset = ISIC2016(args, args.data_path, img_ids=train_img_ids, transform=transform_train, transform_msk=transform_train_seg,img_ext=img_ext,mask_ext=mask_ext)
+            isic_test_dataset = ISIC2016(args, args.data_path, img_ids=val_img_ids, transform = transform_test, transform_msk= transform_test_seg,img_ext=img_ext,mask_ext=mask_ext)
+
         nice_train_loader = DataLoader(isic_train_dataset, batch_size=args.b, shuffle=True, num_workers=8, pin_memory=True)
         nice_test_loader = DataLoader(isic_test_dataset, batch_size=args.b, shuffle=False, num_workers=8, pin_memory=True)
         '''end'''
