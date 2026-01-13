@@ -45,11 +45,6 @@ class ISIC2016(Dataset):
 
         if self.joint_transform:
             img, mask, low_mask = self.joint_transform(img, mask)
-        else:
-            # 如果没有joint_transform，需要手动转换为tensor并创建low_mask
-            img = F.to_tensor(img) * 255.0
-            mask = (F.to_tensor(mask) > 0).float()
-            low_mask = mask  # 如果没有joint_transform，low_mask与mask相同
 
         if self.prompt == 'click':
             # mask已经是tensor，形状为(1, H, W)或(H, W)
@@ -65,8 +60,8 @@ class ISIC2016(Dataset):
 
         return {
             'image': img,
-            'label': mask,
-            'low_mask': low_mask,
+            'label': low_mask,
+            # 'low_mask': low_mask,
             'p_label': point_label,
             'pt': pt,
             'image_meta_dict': image_meta_dict,
@@ -78,11 +73,11 @@ class ISIC2016(Dataset):
 class ISICJointTransform2D:
     def __init__(
         self,
-        img_size=256,
+        img_size=1024,
         low_img_size=256,
-        ori_size=256,
+        ori_size=1024,
         crop=None,
-        p_flip=0.5,
+        p_flip=0.0,
         p_rota=0.0,
         p_scale=0.0,
         p_gaussn=0.0,
@@ -176,7 +171,7 @@ class ISICJointTransform2D:
             mask = F.affine(mask, *params, interpolation=InterpolationMode.NEAREST)
 
         # ---------- resize to final ----------
-        image = F.resize(image, (self.img_size, self.img_size))
+        image = F.resize(image, (self.img_size, self.img_size), InterpolationMode.BILINEAR)
         mask = F.resize(mask, (self.ori_size, self.ori_size), InterpolationMode.NEAREST)
         low_mask = F.resize(mask, (self.low_img_size, self.low_img_size), InterpolationMode.NEAREST)
 

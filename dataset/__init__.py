@@ -58,14 +58,14 @@ def get_dataloader(args):
             joint_tf_train = ISICJointTransform2D(
                 img_size=args.image_size,
                 low_img_size=args.out_size,
-                ori_size=args.out_size,
+                ori_size=args.image_size,
                 p_flip=0.5,
             )
 
             joint_tf_test = ISICJointTransform2D(
                 img_size=args.image_size,
                 low_img_size=args.out_size,
-                ori_size=args.out_size,
+                ori_size=args.image_size,
                 p_flip=0.0,
                 p_rota=0.0,
                 p_scale=0.0,
